@@ -1,28 +1,100 @@
-import {useState} from 'react';
-import logo from './assets/images/logo-universal.png';
-import './App.css';
-import {Greet} from "../wailsjs/go/main/App";
+import { useCallback, useEffect } from 'react';
+import { SearchBar } from './components/SearchBar';
+import { ResultsList } from './components/ResultsList';
+import { PreviewPanel } from './components/PreviewPanel';
+import { IndexingBar } from './components/IndexingBar';
+import { useSearch } from './hooks/useSearch';
+import { useIndexingStatus } from './hooks/useIndexingStatus';
+import { OpenFile, OpenFolder } from '../wailsjs/go/main/App';
 
 function App() {
-    const [resultText, setResultText] = useState("Please enter your name below 👇");
-    const [name, setName] = useState('');
-    const updateName = (e: any) => setName(e.target.value);
-    const updateResultText = (result: string) => setResultText(result);
+  const {
+    query,
+    setQuery,
+    results,
+    selectedIndex,
+    setSelectedIndex,
+    isSearching,
+  } = useSearch();
 
-    function greet() {
-        Greet(name).then(updateResultText);
-    }
+  const indexingStatus = useIndexingStatus();
 
-    return (
-        <div id="App">
-            <img src={logo} id="logo" alt="logo"/>
-            <div id="result" className="result">{resultText}</div>
-            <div id="input" className="input-box">
-                <input id="name" className="input" onChange={updateName} autoComplete="off" name="input" type="text"/>
-                <button className="btn" onClick={greet}>Greet</button>
-            </div>
-        </div>
-    )
+  const selectedResult = results.length > 0 ? results[selectedIndex] ?? null : null;
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setSelectedIndex((prev: number) =>
+            Math.min(prev + 1, results.length - 1)
+          );
+          break;
+
+        case 'ArrowUp':
+          e.preventDefault();
+          setSelectedIndex((prev: number) => Math.max(prev - 1, 0));
+          break;
+
+        case 'Enter':
+          if (selectedResult) {
+            if (e.ctrlKey || e.metaKey) {
+              OpenFolder(selectedResult.filePath);
+            } else {
+              OpenFile(selectedResult.filePath);
+            }
+          }
+          break;
+
+        case 'Escape':
+          if (query) {
+            setQuery('');
+          }
+          break;
+      }
+    },
+    [results.length, selectedResult, query, setQuery, setSelectedIndex]
+  );
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  return (
+    <div style={styles.root}>
+      <SearchBar
+        query={query}
+        onQueryChange={setQuery}
+        isSearching={isSearching}
+      />
+      <div style={styles.body}>
+        <ResultsList
+          results={results}
+          selectedIndex={selectedIndex}
+          onSelect={setSelectedIndex}
+        />
+        <PreviewPanel result={selectedResult} />
+      </div>
+      <IndexingBar status={indexingStatus} />
+    </div>
+  );
 }
 
-export default App
+const styles: Record<string, React.CSSProperties> = {
+  root: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100vh',
+    width: '100vw',
+    background: 'var(--bg-base)',
+    overflow: 'hidden',
+  },
+  body: {
+    display: 'flex',
+    flex: 1,
+    overflow: 'hidden',
+  },
+};
+
+export default App;

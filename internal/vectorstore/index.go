@@ -1,0 +1,201 @@
+package vectorstore
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+
+	"github.com/TFMV/hnsw"
+)
+
+// SearchResult represents a single search result with its string ID and distance score.
+type SearchResult struct {
+	ID       string
+	Distance float32
+}
+
+// Index wraps an HNSW graph to provide string-ID-based vector operations.
+type Index struct {
+	mu      sync.RWMutex
+	graph   *hnsw.Graph[int]
+	idToKey map[string]int
+	keyToID map[int]string
+	nextKey int
+}
+
+// NewIndex creates a new HNSW vector index with default parameters:
+// M=16, Ml=0.25, EfSearch=50, CosineDistance.
+func NewIndex() *Index {
+	g, err := hnsw.NewGraphWithConfig[int](16, 0.25, 50, hnsw.CosineDistance)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create HNSW graph: %v", err))
+	}
+	return &Index{
+		graph:   g,
+		idToKey: make(map[string]int),
+		keyToID: make(map[int]string),
+		nextKey: 0,
+	}
+}
+
+// Add inserts a vector with the given string ID into the index.
+func (idx *Index) Add(id string, vec []float32) error {
+	idx.mu.Lock()
+	defer idx.mu.Unlock()
+
+	key := idx.nextKey
+	idx.nextKey++
+
+	idx.idToKey[id] = key
+	idx.keyToID[key] = id
+
+	node := hnsw.MakeNode(key, vec)
+	return idx.graph.Add(node)
+}
+
+// BatchAdd inserts multiple vectors into the index.
+func (idx *Index) BatchAdd(ids []string, vecs [][]float32) error {
+	if len(ids) != len(vecs) {
+		return fmt.Errorf("ids and vecs must have the same length")
+	}
+
+	idx.mu.Lock()
+	defer idx.mu.Unlock()
+
+	nodes := make([]hnsw.Node[int], len(ids))
+	for i, id := range ids {
+		key := idx.nextKey
+		idx.nextKey++
+		idx.idToKey[id] = key
+		idx.keyToID[key] = id
+		nodes[i] = hnsw.MakeNode(key, vecs[i])
+	}
+
+	return idx.graph.BatchAdd(nodes)
+}
+
+// Search finds the k nearest neighbors to the query vector.
+// Results are ordered by distance (closest first).
+func (idx *Index) Search(query []float32, k int) ([]SearchResult, error) {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+
+	nodes, err := idx.graph.Search(query, k)
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]SearchResult, len(nodes))
+	for i, node := range nodes {
+		id, ok := idx.keyToID[node.Key]
+		if !ok {
+			id = fmt.Sprintf("unknown-%d", node.Key)
+		}
+		results[i] = SearchResult{
+			ID:       id,
+			Distance: hnsw.CosineDistance(query, node.Value),
+		}
+	}
+	return results, nil
+}
+
+// Delete removes a vector by its string ID. Returns true if the ID existed.
+func (idx *Index) Delete(id string) bool {
+	idx.mu.Lock()
+	defer idx.mu.Unlock()
+
+	key, ok := idx.idToKey[id]
+	if !ok {
+		return false
+	}
+
+	deleted := idx.graph.Delete(key)
+	if deleted {
+		delete(idx.idToKey, id)
+		delete(idx.keyToID, key)
+	}
+	return deleted
+}
+
+// Save persists the index to disk. Creates two files:
+// {path}.graph for the HNSW graph and {path}.map for ID mappings.
+func (idx *Index) Save(path string) error {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+
+	// Save graph
+	sg := &hnsw.SavedGraph[int]{
+		Graph: idx.graph,
+		Path:  path + ".graph",
+	}
+	if err := sg.Save(); err != nil {
+		return fmt.Errorf("saving graph: %w", err)
+	}
+
+	// Save ID mappings
+	f, err := os.Create(path + ".map")
+	if err != nil {
+		return fmt.Errorf("creating map file: %w", err)
+	}
+	defer f.Close()
+
+	w := bufio.NewWriter(f)
+	fmt.Fprintf(w, "%d\n", idx.nextKey)
+	for id, key := range idx.idToKey {
+		fmt.Fprintf(w, "%d\t%s\n", key, id)
+	}
+	return w.Flush()
+}
+
+// LoadIndex loads a previously saved index from disk.
+func LoadIndex(path string) (*Index, error) {
+	// Load graph
+	sg, err := hnsw.LoadSavedGraph[int](path + ".graph")
+	if err != nil {
+		return nil, fmt.Errorf("loading graph: %w", err)
+	}
+
+	// Load ID mappings
+	f, err := os.Open(path + ".map")
+	if err != nil {
+		return nil, fmt.Errorf("opening map file: %w", err)
+	}
+	defer f.Close()
+
+	idToKey := make(map[string]int)
+	keyToID := make(map[int]string)
+	var nextKey int
+
+	scanner := bufio.NewScanner(f)
+	if scanner.Scan() {
+		nextKey, err = strconv.Atoi(strings.TrimSpace(scanner.Text()))
+		if err != nil {
+			return nil, fmt.Errorf("parsing nextKey: %w", err)
+		}
+	}
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.SplitN(line, "\t", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key, err := strconv.Atoi(parts[0])
+		if err != nil {
+			continue
+		}
+		id := parts[1]
+		idToKey[id] = key
+		keyToID[key] = id
+	}
+
+	return &Index{
+		graph:   sg.Graph,
+		idToKey: idToKey,
+		keyToID: keyToID,
+		nextKey: nextKey,
+	}, nil
+}

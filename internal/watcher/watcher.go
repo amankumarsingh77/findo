@@ -1,6 +1,7 @@
 package watcher
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -32,20 +33,24 @@ type Watcher struct {
 	pending  map[string]*time.Timer
 	mu       sync.Mutex
 	done     chan struct{}
+	logger   *slog.Logger
 }
 
 // New creates a new Watcher that sends debounced events to the provided channel.
-func New(events chan<- FileEvent, debounce time.Duration) (*Watcher, error) {
+func New(events chan<- FileEvent, debounce time.Duration, logger *slog.Logger) (*Watcher, error) {
+	log := logger.WithGroup("watcher")
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
+	log.Info("file watcher started", "debounce", debounce)
 	w := &Watcher{
 		fsw:      fsw,
 		events:   events,
 		debounce: debounce,
 		pending:  make(map[string]*time.Timer),
 		done:     make(chan struct{}),
+		logger:   log,
 	}
 	go w.loop()
 	return w, nil
@@ -59,10 +64,11 @@ func (w *Watcher) loop() {
 				return
 			}
 			w.handleEvent(event)
-		case _, ok := <-w.fsw.Errors:
+		case err, ok := <-w.fsw.Errors:
 			if !ok {
 				return
 			}
+			w.logger.Error("watcher error", "error", err)
 		case <-w.done:
 			return
 		}
@@ -106,6 +112,7 @@ func (w *Watcher) handleEvent(event fsnotify.Event) {
 
 // Add watches a directory and all its subdirectories recursively.
 func (w *Watcher) Add(path string) error {
+	w.logger.Info("watching directory", "path", path)
 	return w.addRecursive(path)
 }
 
@@ -121,8 +128,27 @@ func (w *Watcher) addRecursive(root string) error {
 	})
 }
 
+// Remove stops watching a directory and all its subdirectories.
+func (w *Watcher) Remove(path string) error {
+	w.logger.Info("unwatching directory", "path", path)
+	return w.removeRecursive(path)
+}
+
+func (w *Watcher) removeRecursive(root string) error {
+	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil // skip errors
+		}
+		if d.IsDir() {
+			w.fsw.Remove(path)
+		}
+		return nil
+	})
+}
+
 // Close stops the watcher and releases resources.
 func (w *Watcher) Close() error {
+	w.logger.Info("stopping file watcher")
 	close(w.done)
 	return w.fsw.Close()
 }

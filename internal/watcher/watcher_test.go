@@ -1,17 +1,21 @@
 package watcher
 
 import (
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 )
 
+var testLogger = slog.New(slog.NewTextHandler(io.Discard, nil))
+
 func TestWatcher_DetectsNewFile(t *testing.T) {
 	dir := t.TempDir()
 
 	events := make(chan FileEvent, 10)
-	w, err := New(events, 200*time.Millisecond)
+	w, err := New(events, 200*time.Millisecond, testLogger)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +48,7 @@ func TestWatcher_DetectsModifiedFile(t *testing.T) {
 	os.WriteFile(testFile, []byte("original"), 0o644)
 
 	events := make(chan FileEvent, 10)
-	w, err := New(events, 200*time.Millisecond)
+	w, err := New(events, 200*time.Millisecond, testLogger)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +80,7 @@ func TestWatcher_DetectsDeletedFile(t *testing.T) {
 	os.WriteFile(testFile, []byte("delete me"), 0o644)
 
 	events := make(chan FileEvent, 10)
-	w, err := New(events, 200*time.Millisecond)
+	w, err := New(events, 200*time.Millisecond, testLogger)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,5 +104,34 @@ func TestWatcher_DetectsDeletedFile(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for file event")
+	}
+}
+
+func TestWatcher_Remove(t *testing.T) {
+	dir := t.TempDir()
+	events := make(chan FileEvent, 10)
+	w, err := New(events, 50*time.Millisecond, slog.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+
+	if err := w.Add(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := w.Remove(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	// After removal, file changes should not trigger events.
+	os.WriteFile(filepath.Join(dir, "test.txt"), []byte("hello"), 0644)
+	time.Sleep(200 * time.Millisecond)
+
+	select {
+	case ev := <-events:
+		t.Fatalf("should not receive event after remove, got %v", ev)
+	default:
+		// Good — no events.
 	}
 }

@@ -1,10 +1,12 @@
-import { useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { SearchBar } from './components/SearchBar';
 import { ResultsList } from './components/ResultsList';
 import { PreviewPanel } from './components/PreviewPanel';
 import { IndexingBar } from './components/IndexingBar';
+import { FolderManager } from './components/FolderManager';
 import { useSearch } from './hooks/useSearch';
 import { useIndexingStatus } from './hooks/useIndexingStatus';
+import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime';
 import { OpenFile, OpenFolder } from '../wailsjs/go/main/App';
 
 function App() {
@@ -18,6 +20,17 @@ function App() {
   } = useSearch();
 
   const indexingStatus = useIndexingStatus();
+
+  const [showFolderManager, setShowFolderManager] = useState(false);
+
+  useEffect(() => {
+    const cancel = EventsOn('open-folder-manager', () => {
+      setShowFolderManager(true);
+    });
+    return () => {
+      EventsOff('open-folder-manager');
+    };
+  }, []);
 
   const selectedResult = results.length > 0 ? results[selectedIndex] ?? null : null;
 
@@ -77,6 +90,9 @@ function App() {
         <PreviewPanel result={selectedResult} />
       </div>
       <IndexingBar status={indexingStatus} />
+      {showFolderManager && (
+        <FolderManager onClose={() => setShowFolderManager(false)} />
+      )}
     </div>
   );
 }

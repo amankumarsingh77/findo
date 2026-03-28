@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 
 	"universal-search/internal/embedder"
 	"universal-search/internal/indexer"
+	"universal-search/internal/logger"
 	"universal-search/internal/platform"
 	"universal-search/internal/search"
 	"universal-search/internal/store"
@@ -21,13 +23,15 @@ import (
 
 // App struct holds all backend components for the Wails application.
 type App struct {
-	ctx      context.Context
-	store    *store.Store
-	index    *vectorstore.Index
-	embedder *embedder.Embedder
-	engine   *search.Engine
-	pipeline *indexer.Pipeline
-	watcher  *watcher.Watcher
+	ctx       context.Context
+	logger    *slog.Logger
+	store     *store.Store
+	index     *vectorstore.Index
+	indexPath string
+	embedder  *embedder.Embedder
+	engine    *search.Engine
+	pipeline  *indexer.Pipeline
+	watcher   *watcher.Watcher
 }
 
 // SearchResultDTO is the JSON-serializable search result sent to the frontend.
@@ -44,10 +48,13 @@ type SearchResultDTO struct {
 
 // IndexStatusDTO is the JSON-serializable indexing status sent to the frontend.
 type IndexStatusDTO struct {
-	TotalFiles   int    `json:"totalFiles"`
-	IndexedFiles int    `json:"indexedFiles"`
-	CurrentFile  string `json:"currentFile"`
-	IsRunning    bool   `json:"isRunning"`
+	TotalFiles    int    `json:"totalFiles"`
+	IndexedFiles  int    `json:"indexedFiles"`
+	FailedFiles   int    `json:"failedFiles"`
+	CurrentFile   string `json:"currentFile"`
+	IsRunning     bool   `json:"isRunning"`
+	QuotaPaused   bool   `json:"quotaPaused"`
+	QuotaResumeAt string `json:"quotaResumeAt"`
 }
 
 // NewApp creates a new App application struct.
@@ -61,68 +68,98 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
+	// Initialize logger.
+	dataDir, err := platform.DataDir()
+	if err != nil {
+		// Fallback: logger to stderr only if data dir fails.
+		a.logger = slog.Default()
+		a.logger.Error("failed to resolve data directory", "error", err)
+		return
+	}
+	a.logger = logger.New(dataDir)
+	log := a.logger.WithGroup("app")
+	log.Info("starting Universal Search")
+
 	dbPath, err := platform.DBPath()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "db path: %v\n", err)
+		log.Error("failed to resolve db path", "error", err)
 		return
 	}
 
-	a.store, err = store.NewStore(dbPath)
+	a.store, err = store.NewStore(dbPath, a.logger)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "store: %v\n", err)
+		log.Error("failed to initialize store", "error", err)
 		return
 	}
 
 	indexPath, err := platform.IndexPath()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "index path: %v\n", err)
+		log.Error("failed to resolve index path", "error", err)
 		return
 	}
 
-	a.index, err = vectorstore.LoadIndex(indexPath)
+	a.indexPath = indexPath
+	a.index, err = vectorstore.LoadIndex(indexPath, a.logger)
 	if err != nil {
-		a.index = vectorstore.NewIndex()
+		log.Warn("no existing index found, creating new", "error", err)
+		a.index = vectorstore.NewIndex(a.logger)
 	}
 
-	a.embedder, err = embedder.NewEmbedderFromEnv(768)
+	a.embedder, err = embedder.NewEmbedderFromEnv(768, a.logger)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "embedder: %v\n", err)
+		log.Warn("embedder not available", "error", err)
 	}
 
-	a.engine = search.New(a.store, a.index)
+	if a.embedder != nil {
+		a.embedder.StartProbeLoop(ctx)
+	}
+
+	a.engine = search.New(a.store, a.index, a.logger)
 
 	thumbDir, _ := platform.ThumbnailDir()
-	a.pipeline = indexer.NewPipeline(a.store, a.index, a.embedder, thumbDir)
+	a.pipeline = indexer.NewPipeline(a.store, a.index, a.embedder, thumbDir, a.logger)
 
 	// Start file watcher.
 	eventCh := make(chan watcher.FileEvent, 100)
-	a.watcher, err = watcher.New(eventCh, 500*time.Millisecond)
+	a.watcher, err = watcher.New(eventCh, 500*time.Millisecond, a.logger)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "watcher: %v\n", err)
+		log.Error("failed to start file watcher", "error", err)
 	}
 
 	// Background goroutines.
 	go a.watchEvents(eventCh)
 	go a.startWatchingFolders()
 	go a.emitStatusLoop()
+
+	log.Info("startup complete")
+}
+
+// saveIndex persists the vector index to disk.
+func (a *App) saveIndex() {
+	if a.index == nil || a.indexPath == "" {
+		return
+	}
+	if err := a.index.Save(a.indexPath); err != nil {
+		a.logger.WithGroup("app").Error("failed to save index", "error", err)
+	}
 }
 
 // shutdown is called when the Wails app is closing. It stops the pipeline,
 // closes the watcher, saves the index, and closes the store.
 func (a *App) shutdown(ctx context.Context) {
+	log := a.logger.WithGroup("app")
+	log.Info("shutting down")
 	if a.pipeline != nil {
 		a.pipeline.Stop()
 	}
 	if a.watcher != nil {
 		a.watcher.Close()
 	}
-	if a.index != nil {
-		indexPath, _ := platform.IndexPath()
-		a.index.Save(indexPath)
-	}
+	a.saveIndex()
 	if a.store != nil {
 		a.store.Close()
 	}
+	log.Info("shutdown complete")
 }
 
 // Search embeds the query via Gemini and returns the top search results.
@@ -131,6 +168,7 @@ func (a *App) Search(query string) ([]SearchResultDTO, error) {
 		return nil, fmt.Errorf("embedder not initialized — set GEMINI_API_KEY")
 	}
 
+	a.logger.Info("search query", "query", query)
 	vec, err := a.embedder.EmbedQuery(a.ctx, query)
 	if err != nil {
 		return nil, err
@@ -154,6 +192,17 @@ func (a *App) Search(query string) ([]SearchResultDTO, error) {
 			EndTime:       r.EndTime,
 		}
 	}
+
+	a.logger.Info("search results", "query", query, "results", len(dtos))
+	for i, d := range dtos {
+		a.logger.Debug("search result",
+			"rank", i+1,
+			"file", d.FileName,
+			"type", d.FileType,
+			"path", d.FilePath,
+		)
+	}
+
 	return dtos, nil
 }
 
@@ -164,10 +213,13 @@ func (a *App) GetIndexStatus() IndexStatusDTO {
 	}
 	s := a.pipeline.Status()
 	return IndexStatusDTO{
-		TotalFiles:   s.TotalFiles,
-		IndexedFiles: s.IndexedFiles,
-		CurrentFile:  s.CurrentFile,
-		IsRunning:    s.IsRunning,
+		TotalFiles:    s.TotalFiles,
+		IndexedFiles:  s.IndexedFiles,
+		FailedFiles:   s.FailedFiles,
+		CurrentFile:   s.CurrentFile,
+		IsRunning:     s.IsRunning,
+		QuotaPaused:   s.QuotaPaused,
+		QuotaResumeAt: s.QuotaResumeAt,
 	}
 }
 
@@ -197,6 +249,7 @@ func (a *App) ReindexNow() {
 		for _, folder := range folders {
 			a.pipeline.IndexFolder(folder, patterns)
 		}
+		a.saveIndex()
 	}()
 }
 
@@ -206,6 +259,7 @@ func (a *App) AddFolder(path string) error {
 	if a.store == nil {
 		return fmt.Errorf("store not initialized")
 	}
+	a.logger.Info("adding folder", "path", path)
 	if err := a.store.AddIndexedFolder(path); err != nil {
 		return err
 	}
@@ -218,6 +272,7 @@ func (a *App) AddFolder(path string) error {
 		if a.pipeline != nil {
 			patterns, _ := a.store.GetExcludedPatterns()
 			a.pipeline.IndexFolder(path, patterns)
+			a.saveIndex()
 		}
 	}()
 	return nil
@@ -267,7 +322,9 @@ func (a *App) watchEvents(events <-chan watcher.FileEvent) {
 		switch ev.Type {
 		case watcher.FileCreated, watcher.FileModified:
 			if a.pipeline != nil {
-				a.pipeline.IndexSingleFile(ev.Path)
+				if err := a.pipeline.IndexSingleFile(ev.Path); err == nil {
+					a.saveIndex()
+				}
 			}
 		}
 	}

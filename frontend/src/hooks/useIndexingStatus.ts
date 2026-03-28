@@ -4,15 +4,21 @@ import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
 export interface IndexingStatus {
   totalFiles: number;
   indexedFiles: number;
+  failedFiles: number;
   currentFile: string;
   isRunning: boolean;
+  quotaPaused: boolean;
+  quotaResumeAt: string;
 }
 
 const defaultStatus: IndexingStatus = {
   totalFiles: 0,
   indexedFiles: 0,
+  failedFiles: 0,
   currentFile: '',
   isRunning: false,
+  quotaPaused: false,
+  quotaResumeAt: '',
 };
 
 export function useIndexingStatus() {

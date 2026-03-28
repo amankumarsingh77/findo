@@ -6,8 +6,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,10 +20,13 @@ import (
 
 // IndexStatus tracks progress of an indexing operation.
 type IndexStatus struct {
-	TotalFiles   int
-	IndexedFiles int
-	CurrentFile  string
-	IsRunning    bool
+	TotalFiles    int
+	IndexedFiles  int
+	FailedFiles   int
+	CurrentFile   string
+	IsRunning     bool
+	QuotaPaused   bool
+	QuotaResumeAt string // ISO 8601 timestamp or empty
 }
 
 // Pipeline orchestrates file indexing: walking folders, hashing for change
@@ -32,6 +37,7 @@ type Pipeline struct {
 	index    *vectorstore.Index
 	embedder *embedder.Embedder
 	thumbDir string
+	logger   *slog.Logger
 
 	mu      sync.RWMutex
 	status  IndexStatus
@@ -42,13 +48,16 @@ type Pipeline struct {
 }
 
 // NewPipeline creates a new indexing pipeline.
-func NewPipeline(s *store.Store, idx *vectorstore.Index, emb *embedder.Embedder, thumbDir string) *Pipeline {
+func NewPipeline(s *store.Store, idx *vectorstore.Index, emb *embedder.Embedder, thumbDir string, logger *slog.Logger) *Pipeline {
 	ctx, cancel := context.WithCancel(context.Background())
+	log := logger.WithGroup("indexer")
+	log.Info("pipeline created", "thumbDir", thumbDir)
 	return &Pipeline{
 		store:    s,
 		index:    idx,
 		embedder: emb,
 		thumbDir: thumbDir,
+		logger:   log,
 		pauseCh:  make(chan struct{}, 1),
 		ctx:      ctx,
 		cancel:   cancel,
@@ -64,6 +73,7 @@ func (p *Pipeline) Status() IndexStatus {
 
 // Pause pauses the indexing pipeline.
 func (p *Pipeline) Pause() {
+	p.logger.Info("pipeline paused")
 	p.mu.Lock()
 	p.paused = true
 	p.mu.Unlock()
@@ -71,6 +81,7 @@ func (p *Pipeline) Pause() {
 
 // Resume resumes the indexing pipeline after a pause.
 func (p *Pipeline) Resume() {
+	p.logger.Info("pipeline resumed")
 	p.mu.Lock()
 	p.paused = false
 	p.mu.Unlock()
@@ -82,6 +93,7 @@ func (p *Pipeline) Resume() {
 
 // Stop cancels the indexing pipeline.
 func (p *Pipeline) Stop() {
+	p.logger.Info("pipeline stopping")
 	p.cancel()
 }
 
@@ -104,6 +116,9 @@ func (p *Pipeline) waitIfPaused() {
 // IndexFolder walks a folder, classifies files, and indexes each one.
 // Files matching excludePatterns (glob) are skipped.
 func (p *Pipeline) IndexFolder(folderPath string, excludePatterns []string) error {
+	p.logger.Info("indexing folder", "path", folderPath, "excludePatterns", len(excludePatterns))
+	start := time.Now()
+
 	var files []string
 	err := filepath.WalkDir(folderPath, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -127,11 +142,13 @@ func (p *Pipeline) IndexFolder(folderPath string, excludePatterns []string) erro
 		return err
 	}
 
+	p.logger.Info("discovered files", "count", len(files), "folder", folderPath)
+
 	p.mu.Lock()
 	p.status = IndexStatus{TotalFiles: len(files), IsRunning: true}
 	p.mu.Unlock()
 
-	for i, filePath := range files {
+	for _, filePath := range files {
 		select {
 		case <-p.ctx.Done():
 			return p.ctx.Err()
@@ -142,19 +159,40 @@ func (p *Pipeline) IndexFolder(folderPath string, excludePatterns []string) erro
 
 		p.mu.Lock()
 		p.status.CurrentFile = filePath
-		p.status.IndexedFiles = i
 		p.mu.Unlock()
 
 		if err := p.indexFile(filePath); err != nil {
-			// Log error but continue with other files
-			fmt.Fprintf(os.Stderr, "index %s: %v\n", filePath, err)
+			p.logger.Warn("file indexing failed", "path", filePath, "error", err)
+			p.mu.Lock()
+			p.status.FailedFiles++
+			if isQuotaExhaustedError(err) {
+				p.status.QuotaPaused = true
+				p.status.QuotaResumeAt = time.Now().Add(30 * time.Minute).Format(time.RFC3339)
+				p.logger.Error("all API keys exhausted, pausing indexing", "resumeAt", p.status.QuotaResumeAt)
+			}
+			p.mu.Unlock()
+
+			if isQuotaExhaustedError(err) {
+				p.waitForQuotaRecovery()
+			}
+		} else {
+			p.mu.Lock()
+			p.status.IndexedFiles++
+			p.mu.Unlock()
 		}
 	}
 
 	p.mu.Lock()
-	p.status.IndexedFiles = len(files)
 	p.status.IsRunning = false
 	p.mu.Unlock()
+
+	p.logger.Info("folder indexing complete",
+		"folder", folderPath,
+		"indexed", p.status.IndexedFiles,
+		"failed", p.status.FailedFiles,
+		"total", len(files),
+		"duration", time.Since(start),
+	)
 
 	return nil
 }
@@ -178,11 +216,13 @@ func (p *Pipeline) indexFile(filePath string) error {
 	// Check if already indexed with same hash
 	existing, err := p.store.GetFileByPath(filePath)
 	if err == nil && existing.ContentHash == hash {
+		p.logger.Debug("skipping unchanged file", "path", filePath)
 		return nil // unchanged
 	}
 
 	fileType := ClassifyFile(filePath)
 	ext := filepath.Ext(filePath)
+	p.logger.Debug("indexing file", "path", filePath, "type", fileType, "size", info.Size())
 
 	// Generate thumbnail
 	thumbPath, _ := GenerateThumbnail(filePath, p.thumbDir, fileType)
@@ -293,27 +333,32 @@ func (p *Pipeline) indexVideoFile(filePath string, fileID int64) error {
 		// Check for still frames
 		still, err := IsStillFrame(chunk.Path)
 		if err == nil && still {
+			p.logger.Debug("skipping still-frame chunk", "path", filePath, "chunk", chunk.Index)
 			continue
 		}
 
 		// Preprocess
 		preprocessed := filepath.Join(tmpDir, fmt.Sprintf("pre_%03d.mp4", chunk.Index))
 		if err := PreprocessChunk(chunk.Path, preprocessed); err != nil {
+			p.logger.Warn("video preprocess failed", "path", filePath, "chunk", chunk.Index, "error", err)
 			continue
 		}
 
 		data, err := os.ReadFile(preprocessed)
 		if err != nil {
+			p.logger.Warn("reading preprocessed chunk failed", "path", filePath, "chunk", chunk.Index, "error", err)
 			continue
 		}
 
 		vec, err := p.embedder.EmbedBytes(p.ctx, data, "video/mp4")
 		if err != nil {
+			p.logger.Warn("video embedding failed", "path", filePath, "chunk", chunk.Index, "error", err)
 			continue
 		}
 
 		vecID := fmt.Sprintf("f%d-c%d", fileID, chunk.Index)
 		if err := p.index.Add(vecID, vec); err != nil {
+			p.logger.Warn("adding video vector failed", "path", filePath, "chunk", chunk.Index, "error", err)
 			continue
 		}
 
@@ -327,6 +372,33 @@ func (p *Pipeline) indexVideoFile(filePath string, fileID int64) error {
 	}
 
 	return nil
+}
+
+func isQuotaExhaustedError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "keys exhausted") ||
+		strings.Contains(s, "keys are cooling or exhausted")
+}
+
+func (p *Pipeline) waitForQuotaRecovery() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-p.ctx.Done():
+			return
+		case <-ticker.C:
+			p.mu.Lock()
+			p.status.QuotaPaused = false
+			p.status.QuotaResumeAt = ""
+			p.mu.Unlock()
+			p.logger.Info("quota recovery check, resuming indexing")
+			return
+		}
+	}
 }
 
 // hashFile computes the SHA-256 hash of a file's contents.

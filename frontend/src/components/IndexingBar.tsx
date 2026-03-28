@@ -19,11 +19,13 @@ export function IndexingBar({ status }: IndexingBarProps) {
     return null;
   }
 
+  const processed = status.indexedFiles + status.failedFiles;
   const progress = status.totalFiles > 0
-    ? Math.round((status.indexedFiles / status.totalFiles) * 100)
+    ? Math.round((processed / status.totalFiles) * 100)
     : 0;
 
-  const isComplete = !status.isRunning && status.indexedFiles > 0;
+  const isComplete = !status.isRunning && processed > 0;
+  const hasErrors = status.failedFiles > 0;
 
   const handlePauseResume = () => {
     if (paused) {
@@ -46,12 +48,20 @@ export function IndexingBar({ status }: IndexingBarProps) {
             <span style={styles.chevron}>{expanded ? '▾' : '▸'}</span>
           )}
           {isComplete ? (
-            <span style={styles.completeText}>
-              ✓ {status.indexedFiles.toLocaleString()} files indexed
+            <span style={hasErrors ? styles.warningText : styles.completeText}>
+              {hasErrors
+                ? `⚠ ${status.indexedFiles.toLocaleString()} indexed, ${status.failedFiles.toLocaleString()} failed`
+                : `✓ ${status.indexedFiles.toLocaleString()} files indexed`}
+            </span>
+          ) : status.quotaPaused ? (
+            <span style={styles.warningText}>
+              Indexing paused — API quota exhausted
+              {status.quotaResumeAt && `, will retry at ${new Date(status.quotaResumeAt).toLocaleTimeString()}`}
             </span>
           ) : (
             <span style={styles.statusText}>
-              Indexing {status.indexedFiles.toLocaleString()}/{status.totalFiles.toLocaleString()} files
+              Indexing {processed.toLocaleString()}/{status.totalFiles.toLocaleString()} files
+              {hasErrors && ` (${status.failedFiles.toLocaleString()} failed)`}
             </span>
           )}
         </div>
@@ -122,6 +132,10 @@ const styles: Record<string, React.CSSProperties> = {
   completeText: {
     fontSize: '12px',
     color: 'var(--accent-green)',
+  },
+  warningText: {
+    fontSize: '12px',
+    color: '#e5a00d',
   },
   progressWrap: {
     display: 'flex',

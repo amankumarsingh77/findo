@@ -280,3 +280,58 @@ func (e *Embedder) EmbedBytes(ctx context.Context, data []byte, mimeType string)
 func (e *Embedder) EmbedDocument(ctx context.Context, text string) ([]float32, error) {
 	return e.EmbedText(ctx, text, TaskDocument)
 }
+
+func (e *Embedder) StartProbeLoop(ctx context.Context) {
+	if e.indexPool.Len() <= 1 {
+		return
+	}
+
+	go func() {
+		probeTicker := time.NewTicker(30 * time.Minute)
+		midnightTicker := time.NewTicker(1 * time.Minute)
+		defer probeTicker.Stop()
+		defer midnightTicker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-probeTicker.C:
+				e.probeExhaustedKey(ctx)
+			case <-midnightTicker.C:
+				e.checkMidnightReset()
+			}
+		}
+	}()
+
+	e.logger.Info("probe loop started", "indexKeys", e.indexPool.Len())
+}
+
+func (e *Embedder) probeExhaustedKey(ctx context.Context) {
+	mk, idx := e.indexPool.FirstExhausted()
+	if mk == nil {
+		return
+	}
+
+	e.logger.Info("probing exhausted key", "keyIndex", idx)
+	content := genai.NewContentFromText("probe", genai.RoleUser)
+	_, err := e.embedWithClient(ctx, mk.Client, []*genai.Content{content}, TaskRetrieval)
+	if err == nil {
+		mk.Reset()
+		e.logger.Info("probe succeeded, key recovered", "keyIndex", idx)
+	} else {
+		e.logger.Debug("probe failed, key still exhausted", "keyIndex", idx, "error", err)
+	}
+}
+
+func (e *Embedder) checkMidnightReset() {
+	loc, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		loc = time.FixedZone("PT", -8*3600)
+	}
+	now := time.Now().In(loc)
+	if now.Hour() == 0 && now.Minute() == 0 {
+		e.logger.Info("midnight Pacific reset — all index keys restored")
+		e.indexPool.ResetAll()
+	}
+}

@@ -99,3 +99,49 @@ func TestKeyPool_NextHealthy_AllExhausted(t *testing.T) {
 		t.Fatal("expected error when all keys exhausted")
 	}
 }
+
+func TestKeyPool_ProbeRecoversExhaustedKey(t *testing.T) {
+	mk := NewManagedKey("k1")
+	mk.RecordFailure()
+	mk.RecordFailure()
+	mk.RecordFailure()
+	if mk.State() != KeyExhausted {
+		t.Fatal("expected EXHAUSTED")
+	}
+	mk.Reset()
+	if mk.State() != KeyHealthy {
+		t.Fatal("expected HEALTHY after probe reset")
+	}
+}
+
+func TestKeyPool_HasExhaustedKeys(t *testing.T) {
+	keys := []*ManagedKey{
+		NewManagedKey("k1"),
+		NewManagedKey("k2"),
+	}
+	pool := NewKeyPool(keys, nil)
+	if pool.HasExhaustedKeys() {
+		t.Fatal("no keys should be exhausted initially")
+	}
+	keys[0].RecordFailure()
+	keys[0].RecordFailure()
+	keys[0].RecordFailure()
+	if !pool.HasExhaustedKeys() {
+		t.Fatal("should detect exhausted key")
+	}
+}
+
+func TestKeyPool_FirstExhausted(t *testing.T) {
+	keys := []*ManagedKey{
+		NewManagedKey("k1"),
+		NewManagedKey("k2"),
+	}
+	pool := NewKeyPool(keys, nil)
+	keys[1].RecordFailure()
+	keys[1].RecordFailure()
+	keys[1].RecordFailure()
+	mk, idx := pool.FirstExhausted()
+	if mk == nil || idx != 1 {
+		t.Fatalf("expected exhausted key at index 1, got idx=%d", idx)
+	}
+}

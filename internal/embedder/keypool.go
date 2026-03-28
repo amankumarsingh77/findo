@@ -151,3 +151,34 @@ func (kp *KeyPool) Keys() []*ManagedKey {
 func (kp *KeyPool) Len() int {
 	return len(kp.keys)
 }
+
+// HasExhaustedKeys reports whether any key in the pool is currently exhausted.
+func (kp *KeyPool) HasExhaustedKeys() bool {
+	for _, k := range kp.keys {
+		if k.State() == KeyExhausted {
+			return true
+		}
+	}
+	return false
+}
+
+// FirstExhausted returns the first exhausted key and its index, or (nil, -1) if none.
+func (kp *KeyPool) FirstExhausted() (*ManagedKey, int) {
+	for i, k := range kp.keys {
+		if k.State() == KeyExhausted {
+			return k, i
+		}
+	}
+	return nil, -1
+}
+
+// AllExhaustedOrCooling reports whether every key in the pool is cooling or exhausted
+// (i.e., no healthy key is available).
+func (kp *KeyPool) AllExhaustedOrCooling() bool {
+	for _, k := range kp.keys {
+		if k.State() == KeyHealthy {
+			return false
+		}
+	}
+	return true
+}

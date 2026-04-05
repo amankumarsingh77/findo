@@ -116,3 +116,13 @@ go test ./...
 - **Video processing:** ffmpeg (subprocess)
 - **File watching:** fsnotify
 - **Excel parsing:** excelize
+
+## Rules
+- Do NOT write comments unless required. 
+
+## Git rules
+
+- Never commit docs/ — these are local working files, not part of the deliverable.
+- Never add Co-Authored-By or any AI attribution to commits.
+- No emojis in commit messages.
+- Write commit messages in a natural, human tone — as if the developer wrote them. Keep them concise and descriptive.

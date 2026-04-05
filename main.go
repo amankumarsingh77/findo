@@ -128,15 +128,7 @@ func main() {
 
 	// "Settings" menu
 	settingsMenu := appMenu.AddSubmenu("Settings")
-	settingsMenu.AddText("Add Folder...", keys.CmdOrCtrl("o"), func(cd *menu.CallbackData) {
-		dir, err := runtime.OpenDirectoryDialog(app.ctx, runtime.OpenDialogOptions{
-			Title: "Select folder to index",
-		})
-		if err == nil && dir != "" {
-			app.AddFolder(dir)
-		}
-	})
-	settingsMenu.AddText("Manage Folders...", nil, func(cd *menu.CallbackData) {
+	settingsMenu.AddText("Manage Folders...", keys.CmdOrCtrl("o"), func(cd *menu.CallbackData) {
 		runtime.EventsEmit(app.ctx, "open-folder-manager")
 	})
 

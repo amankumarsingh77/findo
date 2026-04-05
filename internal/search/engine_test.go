@@ -1,19 +1,23 @@
 package search
 
 import (
+	"io"
+	"log/slog"
 	"testing"
 
 	"universal-search/internal/store"
 	"universal-search/internal/vectorstore"
 )
 
+var testLogger = slog.New(slog.NewTextHandler(io.Discard, nil))
+
 func TestEngine_SearchReturnsRankedResults(t *testing.T) {
-	db, err := store.NewStore(":memory:")
+	db, err := store.NewStore(":memory:", testLogger)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	idx := vectorstore.NewIndex()
+	idx := vectorstore.NewIndex(testLogger)
 
 	// Insert a file + chunk
 	fileID, err := db.UpsertFile(store.FileRecord{
@@ -37,7 +41,7 @@ func TestEngine_SearchReturnsRankedResults(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	engine := New(db, idx)
+	engine := New(db, idx, testLogger)
 
 	// Search with similar vector
 	query := make([]float32, 768)
@@ -58,12 +62,12 @@ func TestEngine_SearchReturnsRankedResults(t *testing.T) {
 }
 
 func TestEngine_DeduplicatesByFilePath(t *testing.T) {
-	db, err := store.NewStore(":memory:")
+	db, err := store.NewStore(":memory:", testLogger)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	idx := vectorstore.NewIndex()
+	idx := vectorstore.NewIndex(testLogger)
 
 	// Insert one file with two chunks
 	fileID, err := db.UpsertFile(store.FileRecord{
@@ -97,7 +101,7 @@ func TestEngine_DeduplicatesByFilePath(t *testing.T) {
 	vecB[1] = 0.2
 	idx.Add("vec-b", vecB)
 
-	engine := New(db, idx)
+	engine := New(db, idx, testLogger)
 
 	query := make([]float32, 768)
 	query[0] = 1.0
@@ -116,14 +120,14 @@ func TestEngine_DeduplicatesByFilePath(t *testing.T) {
 }
 
 func TestEngine_SearchEmptyIndex(t *testing.T) {
-	db, err := store.NewStore(":memory:")
+	db, err := store.NewStore(":memory:", testLogger)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	idx := vectorstore.NewIndex()
+	idx := vectorstore.NewIndex(testLogger)
 
-	engine := New(db, idx)
+	engine := New(db, idx, testLogger)
 
 	query := make([]float32, 768)
 	query[0] = 1.0

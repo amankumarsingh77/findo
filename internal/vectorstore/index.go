@@ -3,6 +3,7 @@ package vectorstore
 import (
 	"bufio"
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -24,20 +25,24 @@ type Index struct {
 	idToKey map[string]int
 	keyToID map[int]string
 	nextKey int
+	logger  *slog.Logger
 }
 
 // NewIndex creates a new HNSW vector index with default parameters:
-// M=16, Ml=0.25, EfSearch=50, CosineDistance.
-func NewIndex() *Index {
-	g, err := hnsw.NewGraphWithConfig[int](16, 0.25, 50, hnsw.CosineDistance)
+// M=16, Ml=0.25, EfSearch=200, CosineDistance.
+func NewIndex(logger *slog.Logger) *Index {
+	log := logger.WithGroup("vectorstore")
+	g, err := hnsw.NewGraphWithConfig[int](16, 0.25, 200, hnsw.CosineDistance)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create HNSW graph: %v", err))
 	}
+	log.Info("created new vector index")
 	return &Index{
 		graph:   g,
 		idToKey: make(map[string]int),
 		keyToID: make(map[int]string),
 		nextKey: 0,
+		logger:  log,
 	}
 }
 
@@ -45,6 +50,13 @@ func NewIndex() *Index {
 func (idx *Index) Add(id string, vec []float32) error {
 	idx.mu.Lock()
 	defer idx.mu.Unlock()
+
+	if idx.graph == nil {
+		return fmt.Errorf("vector index not initialized")
+	}
+	if len(vec) == 0 {
+		return fmt.Errorf("empty vector")
+	}
 
 	key := idx.nextKey
 	idx.nextKey++
@@ -126,6 +138,8 @@ func (idx *Index) Save(path string) error {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 
+	idx.logger.Info("saving index to disk", "path", path, "vectors", len(idx.idToKey))
+
 	// Save graph
 	sg := &hnsw.SavedGraph[int]{
 		Graph: idx.graph,
@@ -151,7 +165,10 @@ func (idx *Index) Save(path string) error {
 }
 
 // LoadIndex loads a previously saved index from disk.
-func LoadIndex(path string) (*Index, error) {
+func LoadIndex(path string, logger *slog.Logger) (*Index, error) {
+	log := logger.WithGroup("vectorstore")
+	log.Info("loading index from disk", "path", path)
+
 	// Load graph
 	sg, err := hnsw.LoadSavedGraph[int](path + ".graph")
 	if err != nil {
@@ -192,10 +209,12 @@ func LoadIndex(path string) (*Index, error) {
 		keyToID[key] = id
 	}
 
+	log.Info("index loaded", "vectors", len(idToKey))
 	return &Index{
 		graph:   sg.Graph,
 		idToKey: idToKey,
 		keyToID: keyToID,
 		nextKey: nextKey,
+		logger:  log,
 	}, nil
 }

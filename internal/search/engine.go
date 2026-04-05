@@ -1,6 +1,9 @@
 package search
 
 import (
+	"log/slog"
+	"time"
+
 	"universal-search/internal/store"
 	"universal-search/internal/vectorstore"
 )
@@ -8,25 +11,33 @@ import (
 // Engine performs semantic search by combining vector similarity search
 // with SQLite metadata lookups.
 type Engine struct {
-	store *store.Store
-	index *vectorstore.Index
+	store  *store.Store
+	index  *vectorstore.Index
+	logger *slog.Logger
 }
 
 // New creates a new search engine backed by the given store and vector index.
-func New(s *store.Store, idx *vectorstore.Index) *Engine {
-	return &Engine{store: s, index: idx}
+func New(s *store.Store, idx *vectorstore.Index, logger *slog.Logger) *Engine {
+	return &Engine{store: s, index: idx, logger: logger.WithGroup("search")}
 }
 
-// SearchByVector searches the HNSW index for the top-k nearest neighbors
-// to queryVec, joins results with SQLite metadata, and deduplicates by
-// file path (keeping the best-ranked match per file).
+// SearchByVector searches the HNSW index for the nearest neighbors to
+// queryVec. It over-fetches 5x candidates from the vector index to ensure
+// cross-cluster diversity (text, image, video embeddings live in different
+// regions), then deduplicates by file path and trims to k results.
 func (e *Engine) SearchByVector(queryVec []float32, k int) ([]store.SearchResult, error) {
-	vecResults, err := e.index.Search(queryVec, k)
+	start := time.Now()
+
+	// Over-fetch to improve diversity across embedding clusters.
+	fetchK := k * 5
+	vecResults, err := e.index.Search(queryVec, fetchK)
 	if err != nil {
+		e.logger.Error("vector search failed", "error", err)
 		return nil, err
 	}
 
 	if len(vecResults) == 0 {
+		e.logger.Debug("no vector results")
 		return nil, nil
 	}
 
@@ -50,6 +61,9 @@ func (e *Engine) SearchByVector(queryVec []float32, k int) ([]store.SearchResult
 	seen := make(map[string]bool)
 	var deduped []store.SearchResult
 	for _, id := range vectorIDs {
+		if len(deduped) >= k {
+			break
+		}
 		r, ok := resultByVecID[id]
 		if !ok {
 			continue
@@ -61,5 +75,6 @@ func (e *Engine) SearchByVector(queryVec []float32, k int) ([]store.SearchResult
 		deduped = append(deduped, r)
 	}
 
+	e.logger.Info("search completed", "results", len(deduped), "candidates", len(vecResults), "duration", time.Since(start))
 	return deduped, nil
 }

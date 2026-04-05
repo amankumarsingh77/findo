@@ -1,13 +1,17 @@
 package vectorstore
 
 import (
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
 )
 
+var testLogger = slog.New(slog.NewTextHandler(io.Discard, nil))
+
 func TestVectorIndex_AddAndSearch(t *testing.T) {
-	idx := NewIndex()
+	idx := NewIndex(testLogger)
 
 	vec1 := make([]float32, 768)
 	vec1[0] = 1.0
@@ -42,7 +46,7 @@ func TestVectorIndex_SaveAndLoad(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.hnsw")
 
-	idx := NewIndex()
+	idx := NewIndex(testLogger)
 	vec := make([]float32, 768)
 	vec[0] = 1.0
 	idx.Add("id-1", vec)
@@ -56,7 +60,7 @@ func TestVectorIndex_SaveAndLoad(t *testing.T) {
 		t.Fatal("graph file not created")
 	}
 
-	idx2, err := LoadIndex(path)
+	idx2, err := LoadIndex(path, testLogger)
 	if err != nil {
 		t.Fatalf("LoadIndex failed: %v", err)
 	}
@@ -73,7 +77,7 @@ func TestVectorIndex_SaveAndLoad(t *testing.T) {
 }
 
 func TestVectorIndex_Delete(t *testing.T) {
-	idx := NewIndex()
+	idx := NewIndex(testLogger)
 	vec := make([]float32, 768)
 	vec[0] = 1.0
 	idx.Add("id-1", vec)

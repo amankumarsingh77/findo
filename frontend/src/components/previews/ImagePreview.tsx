@@ -8,7 +8,7 @@ export function ImagePreview({ result }: ImagePreviewProps) {
   return (
     <div style={styles.container}>
       <img
-        src={`wails://localhost/${result.filePath}`}
+        src={`/localfile/${result.filePath}`}
         alt={result.fileName}
         style={styles.image}
         onError={(e) => {

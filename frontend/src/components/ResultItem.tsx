@@ -68,7 +68,7 @@ export function ResultItem({ result, isSelected, onClick }: ResultItemProps) {
       <div style={styles.thumbnail}>
         {hasThumbnail ? (
           <img
-            src={`wails://localhost/${result.thumbnailPath}`}
+            src={`/localfile/${result.thumbnailPath}`}
             alt=""
             style={styles.thumbImage}
             onError={(e) => {

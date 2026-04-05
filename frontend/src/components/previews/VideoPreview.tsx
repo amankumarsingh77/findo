@@ -49,14 +49,14 @@ export function VideoPreview({ result }: VideoPreviewProps) {
       )}
       {error && (
         <div style={styles.loading}>
-          <span style={styles.errorText}>Could not generate preview</span>
+          <span style={styles.errorText}>{error}</span>
         </div>
       )}
       {clipPath && !loading && (
         <div style={styles.videoWrap}>
           <video
             key={clipPath}
-            src={`wails://localhost/${clipPath}`}
+            src={`/localfile/${clipPath}`}
             autoPlay
             muted
             loop

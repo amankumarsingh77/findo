@@ -34,6 +34,10 @@ export function ReindexNow() {
   return window['go']['main']['App']['ReindexNow']();
 }
 
+export function RemoveFolder(arg1, arg2) {
+  return window['go']['main']['App']['RemoveFolder'](arg1, arg2);
+}
+
 export function ResumeIndexing() {
   return window['go']['main']['App']['ResumeIndexing']();
 }

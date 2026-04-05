@@ -22,7 +22,7 @@ export function AudioPreview({ result }: AudioPreviewProps) {
         </div>
       </div>
       <audio
-        src={`wails://localhost/${result.filePath}`}
+        src={`/localfile/${result.filePath}`}
         controls
         style={styles.audio}
       />

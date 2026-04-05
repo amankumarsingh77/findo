@@ -3,8 +3,11 @@ export namespace main {
 	export class IndexStatusDTO {
 	    totalFiles: number;
 	    indexedFiles: number;
+	    failedFiles: number;
 	    currentFile: string;
 	    isRunning: boolean;
+	    quotaPaused: boolean;
+	    quotaResumeAt: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new IndexStatusDTO(source);
@@ -14,8 +17,11 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.totalFiles = source["totalFiles"];
 	        this.indexedFiles = source["indexedFiles"];
+	        this.failedFiles = source["failedFiles"];
 	        this.currentFile = source["currentFile"];
 	        this.isRunning = source["isRunning"];
+	        this.quotaPaused = source["quotaPaused"];
+	        this.quotaResumeAt = source["quotaResumeAt"];
 	    }
 	}
 	export class SearchResultDTO {

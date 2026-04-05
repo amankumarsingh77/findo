@@ -18,6 +18,8 @@ export function PauseIndexing():Promise<void>;
 
 export function ReindexNow():Promise<void>;
 
+export function RemoveFolder(arg1:string,arg2:boolean):Promise<void>;
+
 export function ResumeIndexing():Promise<void>;
 
 export function Search(arg1:string):Promise<Array<main.SearchResultDTO>>;

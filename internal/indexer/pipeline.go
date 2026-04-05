@@ -13,12 +13,12 @@ import (
 	"sync"
 	"time"
 
+	"universal-search/internal/chunker"
 	"universal-search/internal/embedder"
 	"universal-search/internal/store"
 	"universal-search/internal/vectorstore"
 )
 
-// IndexStatus tracks progress of an indexing operation.
 type IndexStatus struct {
 	TotalFiles    int
 	IndexedFiles  int
@@ -26,12 +26,25 @@ type IndexStatus struct {
 	CurrentFile   string
 	IsRunning     bool
 	QuotaPaused   bool
-	QuotaResumeAt string // ISO 8601 timestamp or empty
+	QuotaResumeAt string
 }
 
-// Pipeline orchestrates file indexing: walking folders, hashing for change
-// detection, generating thumbnails, extracting/embedding content, and storing
-// vectors and metadata.
+type jobType int
+
+const (
+	jobFolder jobType = iota
+	jobSingleFile
+)
+
+type indexJob struct {
+	typ             jobType
+	folderPath      string
+	excludePatterns []string
+	filePath        string
+}
+
+type OnJobDone func()
+
 type Pipeline struct {
 	store    *store.Store
 	index    *vectorstore.Index
@@ -45,33 +58,39 @@ type Pipeline struct {
 	pauseCh chan struct{}
 	ctx     context.Context
 	cancel  context.CancelFunc
+
+	jobCh     chan indexJob
+	onJobDone OnJobDone
+	workerWg  sync.WaitGroup
 }
 
-// NewPipeline creates a new indexing pipeline.
-func NewPipeline(s *store.Store, idx *vectorstore.Index, emb *embedder.Embedder, thumbDir string, logger *slog.Logger) *Pipeline {
+func NewPipeline(s *store.Store, idx *vectorstore.Index, emb *embedder.Embedder, thumbDir string, logger *slog.Logger, onDone OnJobDone) *Pipeline {
 	ctx, cancel := context.WithCancel(context.Background())
 	log := logger.WithGroup("indexer")
 	log.Info("pipeline created", "thumbDir", thumbDir)
-	return &Pipeline{
-		store:    s,
-		index:    idx,
-		embedder: emb,
-		thumbDir: thumbDir,
-		logger:   log,
-		pauseCh:  make(chan struct{}, 1),
-		ctx:      ctx,
-		cancel:   cancel,
+	p := &Pipeline{
+		store:     s,
+		index:     idx,
+		embedder:  emb,
+		thumbDir:  thumbDir,
+		logger:    log,
+		pauseCh:   make(chan struct{}, 1),
+		ctx:       ctx,
+		cancel:    cancel,
+		jobCh:     make(chan indexJob, 64),
+		onJobDone: onDone,
 	}
+	p.workerWg.Add(1)
+	go p.worker()
+	return p
 }
 
-// Status returns the current indexing progress.
 func (p *Pipeline) Status() IndexStatus {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.status
 }
 
-// Pause pauses the indexing pipeline.
 func (p *Pipeline) Pause() {
 	p.logger.Info("pipeline paused")
 	p.mu.Lock()
@@ -79,7 +98,6 @@ func (p *Pipeline) Pause() {
 	p.mu.Unlock()
 }
 
-// Resume resumes the indexing pipeline after a pause.
 func (p *Pipeline) Resume() {
 	p.logger.Info("pipeline resumed")
 	p.mu.Lock()
@@ -91,10 +109,44 @@ func (p *Pipeline) Resume() {
 	}
 }
 
-// Stop cancels the indexing pipeline.
 func (p *Pipeline) Stop() {
 	p.logger.Info("pipeline stopping")
 	p.cancel()
+	p.workerWg.Wait()
+}
+
+func (p *Pipeline) SubmitFolder(folderPath string, excludePatterns []string) {
+	select {
+	case p.jobCh <- indexJob{typ: jobFolder, folderPath: folderPath, excludePatterns: excludePatterns}:
+	case <-p.ctx.Done():
+	}
+}
+
+func (p *Pipeline) SubmitFile(filePath string) {
+	select {
+	case p.jobCh <- indexJob{typ: jobSingleFile, filePath: filePath}:
+	case <-p.ctx.Done():
+	}
+}
+
+func (p *Pipeline) worker() {
+	defer p.workerWg.Done()
+	for {
+		select {
+		case job := <-p.jobCh:
+			switch job.typ {
+			case jobFolder:
+				p.processFolder(job.folderPath, job.excludePatterns)
+			case jobSingleFile:
+				p.processSingleFile(job.filePath)
+			}
+			if p.onJobDone != nil {
+				p.onJobDone()
+			}
+		case <-p.ctx.Done():
+			return
+		}
+	}
 }
 
 func (p *Pipeline) waitIfPaused() {
@@ -113,16 +165,14 @@ func (p *Pipeline) waitIfPaused() {
 	}
 }
 
-// IndexFolder walks a folder, classifies files, and indexes each one.
-// Files matching excludePatterns (glob) are skipped.
-func (p *Pipeline) IndexFolder(folderPath string, excludePatterns []string) error {
+func (p *Pipeline) processFolder(folderPath string, excludePatterns []string) {
 	p.logger.Info("indexing folder", "path", folderPath, "excludePatterns", len(excludePatterns))
 	start := time.Now()
 
 	var files []string
 	err := filepath.WalkDir(folderPath, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil // skip errors, continue walking
+			return nil
 		}
 		if d.IsDir() {
 			for _, pat := range excludePatterns {
@@ -132,26 +182,28 @@ func (p *Pipeline) IndexFolder(folderPath string, excludePatterns []string) erro
 			}
 			return nil
 		}
-		ft := ClassifyFile(path)
-		if ft != "" {
+		ft := chunker.Classify(path)
+		if ft != chunker.TypeUnknown {
 			files = append(files, path)
 		}
 		return nil
 	})
 	if err != nil {
-		return err
+		p.logger.Error("folder walk failed", "path", folderPath, "error", err)
+		return
 	}
 
 	p.logger.Info("discovered files", "count", len(files), "folder", folderPath)
 
 	p.mu.Lock()
-	p.status = IndexStatus{TotalFiles: len(files), IsRunning: true}
+	p.status.TotalFiles += len(files)
+	p.status.IsRunning = true
 	p.mu.Unlock()
 
 	for _, filePath := range files {
 		select {
 		case <-p.ctx.Done():
-			return p.ctx.Err()
+			return
 		default:
 		}
 
@@ -183,23 +235,44 @@ func (p *Pipeline) IndexFolder(folderPath string, excludePatterns []string) erro
 	}
 
 	p.mu.Lock()
-	p.status.IsRunning = false
+	if len(p.jobCh) == 0 {
+		p.status.IsRunning = false
+	}
 	p.mu.Unlock()
 
 	p.logger.Info("folder indexing complete",
 		"folder", folderPath,
 		"indexed", p.status.IndexedFiles,
 		"failed", p.status.FailedFiles,
-		"total", len(files),
+		"total", p.status.TotalFiles,
 		"duration", time.Since(start),
 	)
-
-	return nil
 }
 
-// IndexSingleFile indexes a single file.
-func (p *Pipeline) IndexSingleFile(filePath string) error {
-	return p.indexFile(filePath)
+func (p *Pipeline) processSingleFile(filePath string) {
+	p.mu.Lock()
+	p.status.TotalFiles++
+	p.status.IsRunning = true
+	p.status.CurrentFile = filePath
+	p.mu.Unlock()
+
+	if err := p.indexFile(filePath); err != nil {
+		p.logger.Warn("single file indexing failed", "path", filePath, "error", err)
+		p.mu.Lock()
+		p.status.FailedFiles++
+		p.mu.Unlock()
+	} else {
+		p.mu.Lock()
+		p.status.IndexedFiles++
+		p.mu.Unlock()
+	}
+
+	p.mu.Lock()
+	if len(p.jobCh) == 0 {
+		p.status.IsRunning = false
+		p.status.CurrentFile = ""
+	}
+	p.mu.Unlock()
 }
 
 func (p *Pipeline) indexFile(filePath string) error {
@@ -213,24 +286,31 @@ func (p *Pipeline) indexFile(filePath string) error {
 		return err
 	}
 
-	// Check if already indexed with same hash
 	existing, err := p.store.GetFileByPath(filePath)
 	if err == nil && existing.ContentHash == hash {
 		p.logger.Debug("skipping unchanged file", "path", filePath)
-		return nil // unchanged
+		return nil
 	}
 
-	fileType := ClassifyFile(filePath)
+	chunks, fileType, err := chunker.ChunkFile(filePath)
+	if err != nil {
+		return err
+	}
+	if len(chunks) == 0 {
+		return nil
+	}
+
 	ext := filepath.Ext(filePath)
-	p.logger.Debug("indexing file", "path", filePath, "type", fileType, "size", info.Size())
+	p.logger.Debug("indexing file", "path", filePath, "type", string(fileType), "size", info.Size(), "chunks", len(chunks))
 
-	// Generate thumbnail
-	thumbPath, _ := GenerateThumbnail(filePath, p.thumbDir, fileType)
+	thumbPath, thumbErr := GenerateThumbnail(filePath, p.thumbDir, string(fileType))
+	if thumbErr != nil {
+		p.logger.Warn("thumbnail generation failed", "path", filePath, "error", thumbErr)
+	}
 
-	// Upsert file record
 	fileID, err := p.store.UpsertFile(store.FileRecord{
 		Path:          filePath,
-		FileType:      fileType,
+		FileType:      string(fileType),
 		Extension:     ext,
 		SizeBytes:     info.Size(),
 		ModifiedAt:    info.ModTime(),
@@ -242,123 +322,32 @@ func (p *Pipeline) indexFile(filePath string) error {
 		return err
 	}
 
-	// Delete old chunks/vectors for this file
 	oldVecIDs, _ := p.store.GetVectorIDsByFileID(fileID)
 	for _, vid := range oldVecIDs {
 		p.index.Delete(vid)
 	}
 	p.store.DeleteChunksByFileID(fileID)
 
-	// Embed based on file type
-	switch fileType {
-	case "text":
-		return p.indexTextFile(filePath, fileID)
-	case "image":
-		return p.indexBinaryFile(filePath, fileID, MimeType(filePath))
-	case "video":
-		return p.indexVideoFile(filePath, fileID)
-	case "audio":
-		return p.indexBinaryFile(filePath, fileID, MimeType(filePath))
-	}
-
-	return nil
-}
-
-func (p *Pipeline) indexTextFile(filePath string, fileID int64) error {
-	ext := filepath.Ext(filePath)
-	if ext == ".pdf" {
-		// PDFs: embed raw bytes via multimodal
-		return p.indexBinaryFile(filePath, fileID, "application/pdf")
-	}
-
-	content, err := ExtractText(filePath)
-	if err != nil {
-		return err
-	}
-	if content == "" {
-		return nil
-	}
-
-	vec, err := p.embedder.EmbedDocument(p.ctx, content)
-	if err != nil {
-		return err
-	}
-
-	vecID := fmt.Sprintf("f%d-c0", fileID)
-	if err := p.index.Add(vecID, vec); err != nil {
-		return err
-	}
-
-	_, err = p.store.InsertChunk(store.ChunkRecord{
-		FileID: fileID, VectorID: vecID, ChunkIndex: 0,
-	})
-	return err
-}
-
-func (p *Pipeline) indexBinaryFile(filePath string, fileID int64, mimeType string) error {
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return err
-	}
-
-	vec, err := p.embedder.EmbedBytes(p.ctx, data, mimeType)
-	if err != nil {
-		return err
-	}
-
-	vecID := fmt.Sprintf("f%d-c0", fileID)
-	if err := p.index.Add(vecID, vec); err != nil {
-		return err
-	}
-
-	_, err = p.store.InsertChunk(store.ChunkRecord{
-		FileID: fileID, VectorID: vecID, ChunkIndex: 0,
-	})
-	return err
-}
-
-func (p *Pipeline) indexVideoFile(filePath string, fileID int64) error {
-	tmpDir, err := os.MkdirTemp("", "vidchunk-*")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(tmpDir)
-
-	chunks, err := ChunkVideo(filePath, tmpDir, 30, 5)
-	if err != nil {
-		return err
-	}
-
+	fileName := filepath.Base(filePath)
 	for _, chunk := range chunks {
-		// Check for still frames
-		still, err := IsStillFrame(chunk.Path)
-		if err == nil && still {
-			p.logger.Debug("skipping still-frame chunk", "path", filePath, "chunk", chunk.Index)
+		var vec []float32
+
+		if chunk.Text != "" {
+			vec, err = p.embedder.EmbedDocumentWithTitle(p.ctx, fileName, chunk.Text)
+		} else if len(chunk.Content) > 0 {
+			vec, err = p.embedder.EmbedBytes(p.ctx, chunk.Content, chunk.MimeType, fileName)
+		} else {
 			continue
 		}
 
-		// Preprocess
-		preprocessed := filepath.Join(tmpDir, fmt.Sprintf("pre_%03d.mp4", chunk.Index))
-		if err := PreprocessChunk(chunk.Path, preprocessed); err != nil {
-			p.logger.Warn("video preprocess failed", "path", filePath, "chunk", chunk.Index, "error", err)
-			continue
-		}
-
-		data, err := os.ReadFile(preprocessed)
 		if err != nil {
-			p.logger.Warn("reading preprocessed chunk failed", "path", filePath, "chunk", chunk.Index, "error", err)
-			continue
-		}
-
-		vec, err := p.embedder.EmbedBytes(p.ctx, data, "video/mp4")
-		if err != nil {
-			p.logger.Warn("video embedding failed", "path", filePath, "chunk", chunk.Index, "error", err)
+			p.logger.Warn("embedding failed", "path", filePath, "chunk", chunk.Index, "error", err)
 			continue
 		}
 
 		vecID := fmt.Sprintf("f%d-c%d", fileID, chunk.Index)
 		if err := p.index.Add(vecID, vec); err != nil {
-			p.logger.Warn("adding video vector failed", "path", filePath, "chunk", chunk.Index, "error", err)
+			p.logger.Warn("adding vector failed", "path", filePath, "chunk", chunk.Index, "error", err)
 			continue
 		}
 
@@ -401,7 +390,6 @@ func (p *Pipeline) waitForQuotaRecovery() {
 	}
 }
 
-// hashFile computes the SHA-256 hash of a file's contents.
 func hashFile(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {

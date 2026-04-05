@@ -7,15 +7,12 @@ func TestClassifyFile(t *testing.T) {
 		path     string
 		expected string
 	}{
-		{"doc.pdf", "text"},
+		{"doc.pdf", "document"},
 		{"photo.jpg", "image"},
 		{"clip.mp4", "video"},
 		{"song.mp3", "audio"},
-		{"main.go", "text"},
-		{"data.csv", "text"},
 		{"pic.webp", "image"},
-		{"movie.mkv", "video"},
-		{"unknown.xyz", ""},
+		{"slides.pptx", "document"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {

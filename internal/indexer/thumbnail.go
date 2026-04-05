@@ -1,6 +1,8 @@
 package indexer
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -17,11 +19,12 @@ const thumbnailSize = 80
 // GenerateThumbnail creates a JPEG thumbnail for the given file.
 // Returns the output path, or ("", nil) if no thumbnail is applicable.
 func GenerateThumbnail(filePath, outputDir string, fileType string) (string, error) {
-	hash := fmt.Sprintf("%x", filePath) // simple deterministic name
-	name := hash
-	if len(name) > 16 {
-		name = name[:16]
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return "", fmt.Errorf("create thumbnail dir: %w", err)
 	}
+
+	sum := sha256.Sum256([]byte(filePath))
+	name := hex.EncodeToString(sum[:8]) // 16 hex chars from 8 bytes of SHA-256
 	outPath := filepath.Join(outputDir, name+".jpg")
 
 	if _, err := os.Stat(outPath); err == nil {

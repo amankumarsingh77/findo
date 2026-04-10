@@ -637,6 +637,161 @@ func TestGetAllFiles_Returns3Files(t *testing.T) {
 	}
 }
 
+// --- Query cache tests ---
+
+func TestQueryCache_RoundTrip(t *testing.T) {
+	s, err := NewStore(":memory:", testLogger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	vec := []float32{0.1, 0.2, 0.3, -0.5, 1.0}
+	if err := s.SetQueryCache("hello world", vec); err != nil {
+		t.Fatalf("SetQueryCache failed: %v", err)
+	}
+
+	got, err := s.GetQueryCache("hello world")
+	if err != nil {
+		t.Fatalf("GetQueryCache failed: %v", err)
+	}
+	if len(got) != len(vec) {
+		t.Fatalf("expected %d floats, got %d", len(vec), len(got))
+	}
+	for i := range vec {
+		if got[i] != vec[i] {
+			t.Fatalf("mismatch at index %d: want %v, got %v", i, vec[i], got[i])
+		}
+	}
+}
+
+func TestQueryCache_Miss_ReturnsNilNil(t *testing.T) {
+	s, err := NewStore(":memory:", testLogger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	got, err := s.GetQueryCache("nonexistent query")
+	if err != nil {
+		t.Fatalf("expected nil error on cache miss, got: %v", err)
+	}
+	if got != nil {
+		t.Fatalf("expected nil vector on cache miss, got: %v", got)
+	}
+}
+
+func TestQueryCache_Normalization(t *testing.T) {
+	s, err := NewStore(":memory:", testLogger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	vec := []float32{1.0, 2.0, 3.0}
+	// Store with padded and mixed-case key.
+	if err := s.SetQueryCache("  Hello World  ", vec); err != nil {
+		t.Fatalf("SetQueryCache failed: %v", err)
+	}
+
+	// Retrieve with normalized form.
+	got, err := s.GetQueryCache("hello world")
+	if err != nil {
+		t.Fatalf("GetQueryCache failed: %v", err)
+	}
+	if len(got) != len(vec) {
+		t.Fatalf("expected vector via normalized key, got nil or wrong length")
+	}
+	for i := range vec {
+		if got[i] != vec[i] {
+			t.Fatalf("mismatch at index %d: want %v, got %v", i, vec[i], got[i])
+		}
+	}
+}
+
+func TestQueryCache_Upsert(t *testing.T) {
+	s, err := NewStore(":memory:", testLogger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	first := []float32{1.0, 2.0}
+	second := []float32{9.0, 8.0}
+
+	if err := s.SetQueryCache("query", first); err != nil {
+		t.Fatalf("first SetQueryCache failed: %v", err)
+	}
+	if err := s.SetQueryCache("query", second); err != nil {
+		t.Fatalf("second SetQueryCache failed: %v", err)
+	}
+
+	got, err := s.GetQueryCache("query")
+	if err != nil {
+		t.Fatalf("GetQueryCache failed: %v", err)
+	}
+	if len(got) != len(second) {
+		t.Fatalf("expected %d floats, got %d", len(second), len(got))
+	}
+	for i := range second {
+		if got[i] != second[i] {
+			t.Fatalf("mismatch at index %d: want %v, got %v", i, second[i], got[i])
+		}
+	}
+}
+
+func TestQueryCache_Eviction_ZeroTTL_RemovesEntry(t *testing.T) {
+	s, err := NewStore(":memory:", testLogger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	vec := []float32{0.5, 0.6}
+	if err := s.SetQueryCache("evict me", vec); err != nil {
+		t.Fatalf("SetQueryCache failed: %v", err)
+	}
+
+	// Zero duration means cutoff = now, so everything inserted before now is evicted.
+	if err := s.EvictOldQueryCache(0); err != nil {
+		t.Fatalf("EvictOldQueryCache failed: %v", err)
+	}
+
+	got, err := s.GetQueryCache("evict me")
+	if err != nil {
+		t.Fatalf("GetQueryCache failed: %v", err)
+	}
+	if got != nil {
+		t.Fatalf("expected entry to be evicted, but still found: %v", got)
+	}
+}
+
+func TestQueryCache_Eviction_LargeTTL_KeepsEntry(t *testing.T) {
+	s, err := NewStore(":memory:", testLogger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	vec := []float32{0.5, 0.6}
+	if err := s.SetQueryCache("keep me", vec); err != nil {
+		t.Fatalf("SetQueryCache failed: %v", err)
+	}
+
+	// 24h TTL — a freshly inserted entry should survive.
+	if err := s.EvictOldQueryCache(24 * time.Hour); err != nil {
+		t.Fatalf("EvictOldQueryCache failed: %v", err)
+	}
+
+	got, err := s.GetQueryCache("keep me")
+	if err != nil {
+		t.Fatalf("GetQueryCache failed: %v", err)
+	}
+	if got == nil {
+		t.Fatal("expected entry to be kept, but it was evicted")
+	}
+}
+
 func TestUpsertFile_UpdatesExisting(t *testing.T) {
 	s, err := NewStore(":memory:", testLogger)
 	if err != nil {

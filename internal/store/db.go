@@ -2,8 +2,10 @@ package store
 
 import (
 	"database/sql"
+	"encoding/binary"
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 	"time"
 
@@ -89,6 +91,12 @@ CREATE TABLE IF NOT EXISTS excluded_patterns (
 CREATE TABLE IF NOT EXISTS settings (
 	key   TEXT PRIMARY KEY,
 	value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS query_cache (
+	query      TEXT PRIMARY KEY,
+	vector     BLOB NOT NULL,
+	created_at INTEGER NOT NULL
 );
 `
 
@@ -535,4 +543,72 @@ func (s *Store) GetExcludedPatterns() ([]string, error) {
 		patterns = append(patterns, p)
 	}
 	return patterns, rows.Err()
+}
+
+// GetQueryCache returns the cached vector for query, or nil if not found.
+// query is normalized (trimmed + lowercased) before lookup.
+func (s *Store) GetQueryCache(query string) ([]float32, error) {
+	q := normalizeQuery(query)
+	var blob []byte
+	err := s.db.QueryRow(`SELECT vector FROM query_cache WHERE query = ?`, q).Scan(&blob)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get query cache: %w", err)
+	}
+	return blobToVec(blob)
+}
+
+// SetQueryCache stores or updates the cached vector for query.
+// query is normalized (trimmed + lowercased) before storage.
+func (s *Store) SetQueryCache(query string, vec []float32) error {
+	q := normalizeQuery(query)
+	blob := vecToBlob(vec)
+	_, err := s.db.Exec(
+		`INSERT INTO query_cache (query, vector, created_at) VALUES (?, ?, ?)
+		 ON CONFLICT(query) DO UPDATE SET vector = excluded.vector, created_at = excluded.created_at`,
+		q, blob, time.Now().Unix(),
+	)
+	if err != nil {
+		return fmt.Errorf("set query cache: %w", err)
+	}
+	return nil
+}
+
+// EvictOldQueryCache deletes all query cache entries older than maxAge.
+func (s *Store) EvictOldQueryCache(maxAge time.Duration) error {
+	cutoff := time.Now().Add(-maxAge).Unix()
+	_, err := s.db.Exec(`DELETE FROM query_cache WHERE created_at <= ?`, cutoff)
+	if err != nil {
+		return fmt.Errorf("evict query cache: %w", err)
+	}
+	return nil
+}
+
+// normalizeQuery lowercases and trims whitespace from a query string.
+func normalizeQuery(q string) string {
+	return strings.ToLower(strings.TrimSpace(q))
+}
+
+// vecToBlob encodes a float32 slice as a little-endian byte slice.
+func vecToBlob(vec []float32) []byte {
+	buf := make([]byte, len(vec)*4)
+	for i, v := range vec {
+		binary.LittleEndian.PutUint32(buf[i*4:], math.Float32bits(v))
+	}
+	return buf
+}
+
+// blobToVec decodes a little-endian byte slice into a float32 slice.
+func blobToVec(blob []byte) ([]float32, error) {
+	if len(blob)%4 != 0 {
+		return nil, fmt.Errorf("invalid vector blob length %d", len(blob))
+	}
+	vec := make([]float32, len(blob)/4)
+	for i := range vec {
+		bits := binary.LittleEndian.Uint32(blob[i*4:])
+		vec[i] = math.Float32frombits(bits)
+	}
+	return vec, nil
 }

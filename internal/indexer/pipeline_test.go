@@ -1053,55 +1053,31 @@ func TestPipeline_EmbedBatch_150Chunks(t *testing.T) {
 	}
 }
 
-// TestProcessFolder_PushesJobsToChannel — REQ-003, EDGE-011
-// processFolder must push jobSingleFile entries onto jobCh for each file
-// instead of processing them inline.
-func TestProcessFolder_PushesJobsToChannel(t *testing.T) {
-	p, _, _ := newTestPipelineWithMock(t, &mockEmbedder{}, nil, 0) // 0 workers — no consumption
+// TestProcessFolder_IndexesAllFilesInline — REQ-001, REQ-003
+// processFolder must index all discovered files without routing through jobCh.
+// This avoids deadlock when processFolder runs inside a worker goroutine.
+func TestProcessFolder_IndexesAllFilesInline(t *testing.T) {
+	mock := &mockEmbedder{}
+	p, _, _ := newTestPipelineWithMock(t, mock, func() {}, 4)
 
 	dir := t.TempDir()
 	const numFiles = 3
 	for i := 0; i < numFiles; i++ {
-		name := fmt.Sprintf("push%d.txt", i)
-		if err := os.WriteFile(filepath.Join(dir, name), []byte("hello"), 0o644); err != nil {
+		name := fmt.Sprintf("inline%d.txt", i)
+		content := strings.Repeat(fmt.Sprintf("content for file %d. ", i), 20)
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	// processFolder with force=false. Workers are not running, so jobs accumulate.
-	// We need to drain pendingJobs so processFolder does not block on channel send.
-	// Use a goroutine to drain the channel.
-	var collectedJobs []indexJob
-	var jobMu sync.Mutex
-	drainDone := make(chan struct{})
-	go func() {
-		defer close(drainDone)
-		for {
-			select {
-			case job := <-p.jobCh:
-				p.pendingJobs.Add(-1)
-				jobMu.Lock()
-				collectedJobs = append(collectedJobs, job)
-				jobMu.Unlock()
-			case <-time.After(500 * time.Millisecond):
-				return
-			}
-		}
-	}()
-
+	// processFolder runs synchronously and should embed all files before returning.
 	p.processFolder(dir, nil, false)
-	<-drainDone
 
-	jobMu.Lock()
-	n := len(collectedJobs)
-	jobMu.Unlock()
+	mock.mu.Lock()
+	calls := mock.batchCallCount
+	mock.mu.Unlock()
 
-	if n != numFiles {
-		t.Fatalf("expected %d jobSingleFile entries on jobCh, got %d", numFiles, n)
-	}
-	for _, job := range collectedJobs {
-		if job.typ != jobSingleFile {
-			t.Fatalf("expected jobSingleFile, got %v", job.typ)
-		}
+	if calls != numFiles {
+		t.Fatalf("expected %d EmbedBatch calls (one per file), got %d", numFiles, calls)
 	}
 }

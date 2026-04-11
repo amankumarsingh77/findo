@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetFolders, RemoveFolder, AddIgnoredFolder, GetIgnoredFolders, RemoveIgnoredFolder } from '../../wailsjs/go/main/App';
+import { GetFolders, RemoveFolder, AddIgnoredFolder, GetIgnoredFolders, RemoveIgnoredFolder, ReindexFolder } from '../../wailsjs/go/main/App';
 import { EventsEmit, EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
 
 interface FolderManagerProps {
@@ -69,6 +69,14 @@ export function FolderManager({ onClose }: FolderManagerProps) {
       await loadFolders();
     } catch (err) {
       console.error('Failed to remove folder:', err);
+    }
+  };
+
+  const handleReindex = async (path: string) => {
+    try {
+      await ReindexFolder(path);
+    } catch (err) {
+      console.error('Failed to reindex folder:', err);
     }
   };
 
@@ -142,6 +150,13 @@ export function FolderManager({ onClose }: FolderManagerProps) {
               folders.map((folder) => (
                 <div key={folder} style={styles.folderRow}>
                   <span style={styles.folderPath}>{folder}</span>
+                  <button
+                    style={styles.reindexBtn}
+                    onClick={() => handleReindex(folder)}
+                    title="Reindex folder"
+                  >
+                    ↺
+                  </button>
                   <button
                     style={styles.removeBtn}
                     onClick={() => setConfirm({ path: folder })}
@@ -344,6 +359,17 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--text-tertiary)',
     flexShrink: 0,
     marginRight: '4px',
+  },
+  reindexBtn: {
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-tertiary)',
+    fontSize: '14px',
+    cursor: 'pointer',
+    padding: '2px 6px',
+    borderRadius: 'var(--radius-sm, 4px)',
+    lineHeight: 1,
+    flexShrink: 0,
   },
   removeBtn: {
     background: 'none',

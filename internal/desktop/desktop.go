@@ -141,13 +141,13 @@ func ParseHotkey(combo string) ([]hotkey.Modifier, hotkey.Key, error) {
 	for _, part := range parts[:len(parts)-1] {
 		switch part {
 		case "cmd":
-			mods = append(mods, hotkey.ModCmd)
+			mods = append(mods, modCmd)
 		case "ctrl":
 			mods = append(mods, hotkey.ModCtrl)
 		case "shift":
 			mods = append(mods, hotkey.ModShift)
 		case "alt", "option":
-			mods = append(mods, hotkey.ModOption)
+			mods = append(mods, modAlt)
 		default:
 			return nil, 0, fmt.Errorf("unknown modifier: %s", part)
 		}
@@ -191,13 +191,13 @@ func FormatHotkey(mods []hotkey.Modifier, key hotkey.Key) string {
 	var parts []string
 	for _, m := range mods {
 		switch m {
-		case hotkey.ModCmd:
+		case modCmd:
 			parts = append(parts, "cmd")
 		case hotkey.ModCtrl:
 			parts = append(parts, "ctrl")
 		case hotkey.ModShift:
 			parts = append(parts, "shift")
-		case hotkey.ModOption:
+		case modAlt:
 			parts = append(parts, "alt")
 		}
 	}

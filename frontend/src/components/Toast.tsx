@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 interface ToastProps {
   message: string;
@@ -7,10 +7,13 @@ interface ToastProps {
 }
 
 export default function Toast({ message, type, onDismiss }: ToastProps) {
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+
   useEffect(() => {
-    const timer = setTimeout(onDismiss, 4000);
+    const timer = setTimeout(() => onDismissRef.current(), 4000);
     return () => clearTimeout(timer);
-  }, [onDismiss]);
+  }, []);
 
   return (
     <div style={type === 'success' ? styles.successToast : styles.errorToast}>

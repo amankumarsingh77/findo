@@ -339,6 +339,19 @@ func (a *App) ReindexNow() {
 	}
 }
 
+// ReindexFolder triggers a full re-index of a specific folder.
+func (a *App) ReindexFolder(path string) error {
+	if a.store == nil || a.pipeline == nil {
+		return fmt.Errorf("store not initialized")
+	}
+	patterns, err := a.store.GetExcludedPatterns()
+	if err != nil {
+		return err
+	}
+	a.pipeline.SubmitFolder(path, patterns)
+	return nil
+}
+
 // AddFolder adds a folder to the indexed folders list, starts watching it,
 // and triggers indexing.
 func (a *App) AddFolder(path string) error {

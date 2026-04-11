@@ -1,0 +1,228 @@
+package query
+
+import (
+	"strings"
+	"time"
+	"unicode"
+)
+
+// recognizedOps is the whitelist of operator keywords that may appear before ':'.
+var recognizedOps = map[string]bool{
+	"kind":   true,
+	"ext":    true,
+	"size":   true,
+	"before": true,
+	"after":  true,
+	"since":  true,
+	"in":     true,
+	"path":   true,
+}
+
+// Parse converts a user query string into a FilterSpec.
+// It never panics and returns a best-effort result on malformed input.
+func Parse(input string) (spec FilterSpec) {
+	defer func() {
+		if r := recover(); r != nil {
+			// Return whatever we have so far.
+		}
+		spec.Source = SourceGrammar
+	}()
+
+	now := time.Now()
+	var semanticParts []string
+
+	runes := []rune(input)
+	pos := 0
+	n := len(runes)
+
+	for pos < n {
+		// Skip leading whitespace
+		for pos < n && unicode.IsSpace(runes[pos]) {
+			pos++
+		}
+		if pos >= n {
+			break
+		}
+
+		// Quoted phrase
+		if runes[pos] == '"' {
+			pos++ // consume opening quote
+			start := pos
+			for pos < n && runes[pos] != '"' {
+				pos++
+			}
+			phrase := string(runes[start:pos])
+			if pos < n {
+				pos++ // consume closing quote
+			}
+			semanticParts = append(semanticParts, phrase)
+			continue
+		}
+
+		// Negation: -term
+		if runes[pos] == '-' && pos+1 < n && !unicode.IsSpace(runes[pos+1]) {
+			pos++ // consume '-'
+			term := readToken(runes, &pos)
+			spec.MustNot = append(spec.MustNot, Clause{
+				Field: FieldPath,
+				Op:    OpContains,
+				Value: term,
+			})
+			continue
+		}
+
+		// Read a token (up to whitespace)
+		start := pos
+		tok := readToken(runes, &pos)
+		if tok == "" {
+			continue
+		}
+
+		// Check if this looks like operator:value
+		colonIdx := strings.IndexByte(tok, ':')
+		if colonIdx > 0 {
+			keyword := strings.ToLower(tok[:colonIdx])
+			if recognizedOps[keyword] {
+				value := tok[colonIdx+1:]
+				// If value is empty, peek for next non-space token
+				if value == "" {
+					// Skip whitespace and read next token
+					for pos < n && unicode.IsSpace(runes[pos]) {
+						pos++
+					}
+					value = readToken(runes, &pos)
+				}
+				if clause, extra, handled := parseOperator(keyword, value, now); handled {
+					spec.Must = append(spec.Must, clause...)
+					if extra != "" {
+						semanticParts = append(semanticParts, extra)
+					}
+					continue
+				}
+			}
+			// Not a recognized operator → free text
+			semanticParts = append(semanticParts, string(runes[start:pos]))
+			continue
+		}
+
+		// Plain free text token
+		semanticParts = append(semanticParts, tok)
+	}
+
+	spec.SemanticQuery = strings.TrimSpace(strings.Join(semanticParts, " "))
+	return spec
+}
+
+// readToken reads runes until whitespace or end-of-input.
+func readToken(runes []rune, pos *int) string {
+	start := *pos
+	for *pos < len(runes) && !unicode.IsSpace(runes[*pos]) {
+		(*pos)++
+	}
+	return string(runes[start:*pos])
+}
+
+// parseOperator processes a recognized keyword + value pair.
+// Returns clauses, any residual semantic text, and whether it was handled.
+func parseOperator(keyword, value string, now time.Time) (clauses []Clause, residual string, handled bool) {
+	switch keyword {
+	case "kind":
+		return parseKind(value)
+	case "ext":
+		return parseExt(value)
+	case "size":
+		return parseSize(value)
+	case "before":
+		return parseDateOp("before", value, now)
+	case "after", "since":
+		return parseDateOp("after", value, now)
+	case "path", "in":
+		return parsePath(value)
+	}
+	return nil, "", false
+}
+
+func parseKind(value string) ([]Clause, string, bool) {
+	lower := strings.ToLower(strings.TrimSpace(value))
+	if lower == "" {
+		return nil, "", false
+	}
+	// Direct lookup
+	if canonical, ok := KnownKindValues[lower]; ok {
+		return []Clause{{Field: FieldFileType, Op: OpEq, Value: canonical}}, "", true
+	}
+	// Typo correction
+	if canonical, ok := CorrectKind(lower); ok {
+		return []Clause{{Field: FieldFileType, Op: OpEq, Value: canonical}}, "", true
+	}
+	// Unknown kind value → fall through as semantic
+	return nil, "kind:" + value, false
+}
+
+func parseExt(value string) ([]Clause, string, bool) {
+	if value == "" {
+		return nil, "", false
+	}
+	parts := strings.Split(value, ",")
+	exts := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		// Strip leading dot for typo correction lookup.
+		bare := p
+		if strings.HasPrefix(bare, ".") {
+			bare = bare[1:]
+		}
+		// Typo correction: try to find closest known extension.
+		if corrected, ok := CorrectExtension(bare); ok {
+			exts = append(exts, "."+corrected)
+		} else {
+			// Unknown extension — keep as-is with leading dot.
+			if !strings.HasPrefix(p, ".") {
+				p = "." + p
+			}
+			exts = append(exts, p)
+		}
+	}
+	if len(exts) == 0 {
+		return nil, "", false
+	}
+	return []Clause{{Field: FieldExtension, Op: OpInSet, Value: exts}}, "", true
+}
+
+func parseSize(value string) ([]Clause, string, bool) {
+	op, bytes, ok := ParseSize(value)
+	if !ok {
+		return nil, "size:" + value, false
+	}
+	return []Clause{{Field: FieldSizeBytes, Op: op, Value: bytes}}, "", true
+}
+
+func parseDateOp(direction, value string, now time.Time) ([]Clause, string, bool) {
+	if value == "" {
+		return nil, "", false
+	}
+	afterT, beforeT, ok := NormalizeDate(value, now)
+	if !ok {
+		return nil, direction + ":" + value, false
+	}
+
+	var clauses []Clause
+	switch direction {
+	case "before":
+		// modified_at < beforeT (use afterT as the threshold since NormalizeDate returns start-of-day)
+		clauses = append(clauses, Clause{Field: FieldModifiedAt, Op: OpLt, Value: afterT})
+	case "after":
+		clauses = append(clauses, Clause{Field: FieldModifiedAt, Op: OpGte, Value: beforeT})
+	}
+	return clauses, "", true
+}
+
+func parsePath(value string) ([]Clause, string, bool) {
+	if value == "" {
+		return nil, "", false
+	}
+	return []Clause{{Field: FieldPath, Op: OpContains, Value: value}}, "", true
+}

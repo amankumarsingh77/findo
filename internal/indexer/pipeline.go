@@ -300,33 +300,75 @@ func (p *Pipeline) processFolder(folderPath string, excludePatterns []string, fo
 
 	gen := p.generation.Load()
 
-	// Submit file jobs from a separate goroutine so this worker is freed to
-	// consume from jobCh. Without this, processFolder would block trying to
-	// push onto a full channel while all workers are waiting for it to return.
-	//
-	// Hold a pendingJobs slot for the submission goroutine itself so IsRunning
-	// stays true until all file jobs have been enqueued.
-	p.pendingJobs.Add(1)
-	go func() {
-		defer p.pendingJobs.Add(-1)
-		for _, filePath := range files {
-			if p.generation.Load() != gen {
-				p.logger.Info("reindex generation changed, cancelling in-flight run", "folder", folderPath)
-				return
-			}
-			select {
-			case <-p.ctx.Done():
-				return
-			default:
-			}
-			p.SubmitFile(filePath)
+	// Process files concurrently using a semaphore-bounded pool.
+	// We do NOT route back through jobCh — that would deadlock because this
+	// function is itself running inside a worker. Instead, we spawn goroutines
+	// directly here, bounded by workerCount to respect the rate limiter budget.
+	concurrency := p.workerCount
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	sem := make(chan struct{}, concurrency)
+	var wg sync.WaitGroup
+
+	for _, filePath := range files {
+		if p.generation.Load() != gen {
+			p.logger.Info("reindex generation changed, cancelling folder run", "folder", folderPath)
+			break
 		}
-		p.logger.Info("folder jobs submitted",
-			"folder", folderPath,
-			"files", len(files),
-			"duration", time.Since(start),
-		)
-	}()
+		select {
+		case <-p.ctx.Done():
+			break
+		default:
+		}
+
+		p.waitIfPaused()
+
+		sem <- struct{}{} // acquire slot
+		wg.Add(1)
+		fp := filePath
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }() // release slot
+
+			p.mu.Lock()
+			p.status.CurrentFile = fp
+			p.mu.Unlock()
+
+			if err := p.indexFile(fp, force); err != nil {
+				p.logger.Warn("file indexing failed", "path", fp, "error", err)
+				p.mu.Lock()
+				p.status.FailedFiles++
+				if isQuotaExhaustedError(err) {
+					resumeAt := p.quotaResumeTime()
+					p.status.QuotaPaused = true
+					p.status.QuotaResumeAt = resumeAt.Format(time.RFC3339)
+					p.logger.Error("quota exhausted, pausing indexing", "resumeAt", resumeAt)
+				}
+				p.mu.Unlock()
+			} else {
+				p.mu.Lock()
+				p.status.IndexedFiles++
+				p.mu.Unlock()
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	p.mu.RLock()
+	indexed := p.status.IndexedFiles
+	failed := p.status.FailedFiles
+	total := p.status.TotalFiles
+	p.mu.RUnlock()
+
+	p.logger.Info("folder indexing complete",
+		"folder", folderPath,
+		"indexed", indexed,
+		"failed", failed,
+		"total", total,
+		"duration", time.Since(start),
+	)
 }
 
 func (p *Pipeline) processSingleFile(filePath string) {
@@ -459,6 +501,11 @@ func (p *Pipeline) indexFile(filePath string, force bool) error {
 	}
 
 	// Phase 3: write vectors and chunks to store in chunk.Index order.
+	// Guard against the API returning fewer embeddings than requested.
+	if len(vecs) != len(chunks) {
+		p.logger.Warn("embedding count mismatch", "path", filePath, "chunks", len(chunks), "vecs", len(vecs))
+		return fmt.Errorf("embedding count mismatch for %s: got %d vecs for %d chunks", filePath, len(vecs), len(chunks))
+	}
 	allSucceeded := true
 	for i, vec := range vecs {
 		chunk := chunks[i]

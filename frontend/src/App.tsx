@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { SearchBar } from './components/SearchBar';
 import { ResultsList } from './components/ResultsList';
 import { PreviewPanel } from './components/PreviewPanel';
@@ -22,6 +22,17 @@ function App() {
   } = useSearch();
 
   const indexingStatus = useIndexingStatus();
+
+  const [indexingDismissed, setIndexingDismissed] = useState(false);
+  const prevIsRunningRef = useRef(false);
+
+  useEffect(() => {
+    if (indexingStatus.isRunning && !prevIsRunningRef.current) {
+      // New indexing run started — reset dismissed state so bar reappears
+      setIndexingDismissed(false);
+    }
+    prevIsRunningRef.current = indexingStatus.isRunning;
+  }, [indexingStatus.isRunning]);
 
   const [showFolderManager, setShowFolderManager] = useState(false);
   const [hasFolders, setHasFolders] = useState(true);
@@ -132,7 +143,12 @@ function App() {
         />
         <PreviewPanel result={selectedResult} onOpenFolder={(path) => { OpenFolder(path); HideWindow(); }} />
       </div>
-      <IndexingBar status={indexingStatus} />
+      {!indexingDismissed && (
+        <IndexingBar
+          status={indexingStatus}
+          onDismiss={() => setIndexingDismissed(true)}
+        />
+      )}
       {showFolderManager && (
         <FolderManager onClose={() => setShowFolderManager(false)} />
       )}

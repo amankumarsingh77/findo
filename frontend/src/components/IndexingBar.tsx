@@ -4,6 +4,7 @@ import type { IndexingStatus } from '../hooks/useIndexingStatus';
 
 interface IndexingBarProps {
   status: IndexingStatus;
+  onDismiss: () => void;
 }
 
 function getFileName(path: string): string {
@@ -11,7 +12,7 @@ function getFileName(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
-export function IndexingBar({ status }: IndexingBarProps) {
+export function IndexingBar({ status, onDismiss }: IndexingBarProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (!status.isRunning && status.indexedFiles === 0) {
@@ -63,7 +64,15 @@ export function IndexingBar({ status }: IndexingBarProps) {
           )}
         </div>
 
-        {!isComplete && (
+        {isComplete ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+            style={styles.dismissButton}
+            title="Dismiss"
+          >
+            ×
+          </button>
+        ) : (
           <div style={styles.progressWrap}>
             <div style={styles.progressTrack}>
               <div
@@ -180,6 +189,17 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+  },
+  dismissButton: {
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-tertiary)',
+    fontSize: '18px',
+    cursor: 'pointer',
+    padding: '2px 8px',
+    borderRadius: 'var(--radius-sm)',
+    lineHeight: 1,
+    flexShrink: 0,
   },
   pauseButton: {
     alignSelf: 'flex-start',

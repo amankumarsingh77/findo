@@ -29,7 +29,7 @@ type Engine struct {
 
 // New creates a new search engine backed by the given store and vector index.
 func New(s *store.Store, idx *vectorstore.Index, logger *slog.Logger) *Engine {
-	planner := NewPlanner(s, idx, DefaultBruteForceThreshold)
+	planner := NewPlannerWithLogger(s, idx, DefaultBruteForceThreshold, logger.WithGroup("planner"))
 	return &Engine{store: s, index: idx, logger: logger.WithGroup("search"), planner: planner}
 }
 

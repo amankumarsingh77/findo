@@ -953,13 +953,21 @@ func (a *App) SetNLQueryEnabled(enabled bool) error {
 // When offline (no API key), LLM parse is skipped and IsOffline is set to true.
 func (a *App) ParseQuery(raw string) (ParseQueryResult, error) {
 	if !a.isNLQueryEnabled() {
+		a.logger.Debug("parse_query: NL query disabled, skipping", "raw", raw)
 		return ParseQueryResult{}, nil
 	}
 
 	offline := a.isOfflineMode()
+	a.logger.Debug("parse_query: start", "raw", raw, "offline", offline)
 
 	// Grammar parse — always, no network.
 	grammarSpec := query.Parse(raw)
+	a.logger.Debug("parse_query: grammar parsed",
+		"must", len(grammarSpec.Must),
+		"must_not", len(grammarSpec.MustNot),
+		"should", len(grammarSpec.Should),
+		"semantic_query", grammarSpec.SemanticQuery,
+	)
 
 	// Check cache before LLM.
 	var mergedSpec query.FilterSpec
@@ -968,30 +976,57 @@ func (a *App) ParseQuery(raw string) (ParseQueryResult, error) {
 		if cached, err := a.parsedQueryCache.Get(raw); err == nil && cached != nil {
 			mergedSpec = *cached
 			cacheHit = true
+			a.logger.Debug("parse_query: cache hit", "normalized_key", query.NormalizeKey(raw))
 		}
 	}
 
 	if !cacheHit {
+		a.logger.Debug("parse_query: cache miss")
 		if a.queryStats != nil {
 			a.queryStats.recordCacheMiss()
 		}
 		llmSpec := grammarSpec
 		// Skip LLM when offline.
-		if !offline && query.ShouldInvokeLLM(grammarSpec.SemanticQuery) && a.llmParser != nil && a.ctx != nil {
+		shouldInvoke := !offline && query.ShouldInvokeLLM(grammarSpec.SemanticQuery) && a.llmParser != nil && a.ctx != nil
+		a.logger.Debug("parse_query: LLM invocation decision",
+			"should_invoke", shouldInvoke,
+			"offline", offline,
+			"llm_available", a.llmParser != nil,
+			"trigger_result", query.ShouldInvokeLLM(grammarSpec.SemanticQuery),
+		)
+		if shouldInvoke {
 			ctx, cancel := context.WithTimeout(a.ctx, 500*time.Millisecond)
 			defer cancel()
 			llmStart := time.Now()
+			a.logger.Debug("parse_query: invoking LLM parser")
 			parsed, err := a.llmParser.Parse(ctx, raw, grammarSpec)
+			elapsed := time.Since(llmStart).Milliseconds()
 			if a.queryStats != nil {
-				a.queryStats.recordLLMCall(time.Since(llmStart).Milliseconds())
+				a.queryStats.recordLLMCall(elapsed)
 			}
 			if err == nil {
 				llmSpec = parsed
+				a.logger.Debug("parse_query: LLM parse complete",
+					"latency_ms", elapsed,
+					"must", len(llmSpec.Must),
+					"must_not", len(llmSpec.MustNot),
+					"should", len(llmSpec.Should),
+				)
+			} else {
+				a.logger.Debug("parse_query: LLM parse failed, using grammar-only", "error", err, "latency_ms", elapsed)
 			}
 		}
 		mergedSpec = query.Merge(grammarSpec, llmSpec, nil)
+		a.logger.Debug("parse_query: merged spec",
+			"must", len(mergedSpec.Must),
+			"must_not", len(mergedSpec.MustNot),
+			"should", len(mergedSpec.Should),
+			"semantic_query", mergedSpec.SemanticQuery,
+			"source", mergedSpec.Source,
+		)
 		if a.parsedQueryCache != nil {
 			_ = a.parsedQueryCache.Set(raw, mergedSpec)
+			a.logger.Debug("parse_query: stored in cache")
 		}
 	} else {
 		if a.queryStats != nil {
@@ -1000,6 +1035,7 @@ func (a *App) ParseQuery(raw string) (ParseQueryResult, error) {
 	}
 
 	chips := buildChipDTOs(mergedSpec)
+	a.logger.Debug("parse_query: complete", "chips", len(chips), "cache_hit", cacheHit)
 
 	return ParseQueryResult{
 		Chips:         chips,
@@ -1024,13 +1060,19 @@ func (a *App) SearchWithFilters(raw string, semanticQuery string, denyList []str
 
 	// Offline mode: skip embedding entirely, use filename search.
 	isOffline := a.isOfflineMode()
+	a.logger.Debug("search_with_filters: start", "raw", raw, "offline", isOffline, "deny_list_len", len(denyList))
 	if isOffline {
+		a.logger.Debug("search_with_filters: offline mode, using filename search only")
 		return a.searchFilenameOnly(raw)
 	}
 
 	// Get current FilterSpec (from cache or grammar).
 	grammarSpec := query.Parse(raw)
 	grammarFilterCount := len(grammarSpec.Must) + len(grammarSpec.MustNot) + len(grammarSpec.Should)
+	a.logger.Debug("search_with_filters: grammar parsed",
+		"filter_count", grammarFilterCount,
+		"semantic_query", grammarSpec.SemanticQuery,
+	)
 
 	var mergedSpec query.FilterSpec
 	cacheHit := false
@@ -1038,6 +1080,7 @@ func (a *App) SearchWithFilters(raw string, semanticQuery string, denyList []str
 		if cached, err := a.parsedQueryCache.Get(raw); err == nil && cached != nil {
 			mergedSpec = *cached
 			cacheHit = true
+			a.logger.Debug("search_with_filters: using cached filter spec")
 		} else {
 			mergedSpec = grammarSpec
 		}
@@ -1046,9 +1089,18 @@ func (a *App) SearchWithFilters(raw string, semanticQuery string, denyList []str
 	}
 
 	llmFilterCount := len(mergedSpec.Must) + len(mergedSpec.MustNot) + len(mergedSpec.Should)
+	a.logger.Debug("search_with_filters: filter spec resolved",
+		"grammar_filters", grammarFilterCount,
+		"merged_filters", llmFilterCount,
+		"cache_hit", cacheHit,
+		"source", mergedSpec.Source,
+	)
 
 	// Apply denylist.
 	denyClauseKeys := parseDenyList(denyList)
+	if len(denyClauseKeys) > 0 {
+		a.logger.Debug("search_with_filters: applying denylist", "deny_count", len(denyClauseKeys))
+	}
 	mergedSpec = query.Merge(mergedSpec, query.FilterSpec{}, denyClauseKeys)
 
 	// Override semantic query if provided.
@@ -1065,10 +1117,16 @@ func (a *App) SearchWithFilters(raw string, semanticQuery string, denyList []str
 		return SearchWithFiltersResult{}, nil
 	}
 
+	a.logger.Debug("search_with_filters: embedding query", "query_text", queryText)
 	queryVec, err := a.getQueryVector(queryText)
 	if err != nil {
 		return SearchWithFiltersResult{}, err
 	}
+	a.logger.Debug("search_with_filters: query embedded, running search engine",
+		"must", len(mergedSpec.Must),
+		"must_not", len(mergedSpec.MustNot),
+		"should", len(mergedSpec.Should),
+	)
 
 	// Run SearchWithSpec; on network errors fall back to filename search.
 	searchResult, err := a.engine.SearchWithSpec(queryVec, mergedSpec, raw, 20)
@@ -1080,6 +1138,12 @@ func (a *App) SearchWithFilters(raw string, semanticQuery string, denyList []str
 		}
 		return SearchWithFiltersResult{}, err
 	}
+	a.logger.Debug("search_with_filters: engine returned",
+		"strategy", searchResult.Strategy,
+		"planner_count", searchResult.PlannerCount,
+		"results", len(searchResult.Results),
+		"relaxation_banner", searchResult.RelaxationBanner,
+	)
 
 	dtos := make([]SearchResultDTO, 0, len(searchResult.Results))
 	for _, r := range searchResult.Results {

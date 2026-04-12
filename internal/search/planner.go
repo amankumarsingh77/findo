@@ -1,6 +1,7 @@
 package search
 
 import (
+	"log/slog"
 	"math"
 	"sort"
 
@@ -28,12 +29,18 @@ type Planner struct {
 	store     PlannerStore
 	index     *vectorstore.Index
 	threshold int
+	logger    *slog.Logger
 }
 
 // NewPlanner creates a new Planner. threshold is the file count below which
 // brute-force cosine search is used instead of HNSW post-filtering.
 func NewPlanner(s PlannerStore, idx *vectorstore.Index, threshold int) *Planner {
-	return &Planner{store: s, index: idx, threshold: threshold}
+	return &Planner{store: s, index: idx, threshold: threshold, logger: slog.Default()}
+}
+
+// NewPlannerWithLogger creates a Planner with a custom logger.
+func NewPlannerWithLogger(s PlannerStore, idx *vectorstore.Index, threshold int, logger *slog.Logger) *Planner {
+	return &Planner{store: s, index: idx, threshold: threshold, logger: logger}
 }
 
 // Plan routes between brute-force and HNSW post-filter based on cardinality.
@@ -42,6 +49,7 @@ func NewPlanner(s PlannerStore, idx *vectorstore.Index, threshold int) *Planner 
 func (p *Planner) Plan(queryVec []float32, spec query.FilterSpec, k int) ([]store.SearchResult, string, int, error) {
 	// No structural filters → pure semantic HNSW search.
 	if len(spec.Must) == 0 && len(spec.MustNot) == 0 {
+		p.logger.Debug("planner: no filters, using pure semantic HNSW search", "k", k)
 		results, err := p.index.Search(queryVec, k*5)
 		if err != nil {
 			return nil, "semantic", 0, err
@@ -51,20 +59,28 @@ func (p *Planner) Plan(queryVec []float32, spec query.FilterSpec, k int) ([]stor
 		if err != nil {
 			return nil, "semantic", 0, err
 		}
+		p.logger.Debug("planner: semantic search complete", "candidates", len(storeResults))
 		return storeResults, "semantic", 0, nil
 	}
 
 	storeSpec := convertToStoreSpec(spec)
 
+	p.logger.Debug("planner: counting filtered files",
+		"must_clauses", len(spec.Must),
+		"must_not_clauses", len(spec.MustNot),
+	)
 	count, err := p.store.CountFiltered(storeSpec)
 	if err != nil {
 		return nil, "brute_force", 0, err
 	}
+	p.logger.Debug("planner: filter count result", "count", count, "threshold", p.threshold)
 	if count == 0 {
+		p.logger.Debug("planner: zero matching files for filters, returning empty")
 		return nil, "brute_force", 0, nil
 	}
 
 	if count < p.threshold {
+		p.logger.Debug("planner: using brute-force cosine path", "file_count", count)
 		// Brute-force path: fetch vectors and compute cosine similarity directly.
 		fileIDs, err := p.store.FilterFileIDs(storeSpec)
 		if err != nil {
@@ -75,6 +91,7 @@ func (p *Planner) Plan(queryVec []float32, spec query.FilterSpec, k int) ([]stor
 			return nil, "brute_force", count, err
 		}
 		results := bruteForceCosine(queryVec, blobs, k)
+		p.logger.Debug("planner: brute-force complete", "results", len(results))
 		return results, "brute_force", count, nil
 	}
 
@@ -84,6 +101,11 @@ func (p *Planner) Plan(queryVec []float32, spec query.FilterSpec, k int) ([]stor
 		return nil, "hnsw_post_filter", count, err
 	}
 	ef := clampEf(k, totalFiles, count)
+	p.logger.Debug("planner: using HNSW post-filter path",
+		"file_count", count,
+		"total_files", totalFiles,
+		"ef", ef,
+	)
 
 	hnswResults, err := p.index.Search(queryVec, ef)
 	if err != nil {
@@ -141,6 +163,10 @@ func (p *Planner) Plan(queryVec []float32, spec query.FilterSpec, k int) ([]stor
 	if len(filtered) > k {
 		filtered = filtered[:k]
 	}
+	p.logger.Debug("planner: HNSW post-filter complete",
+		"hnsw_candidates", len(hnswResults),
+		"after_filter", len(filtered),
+	)
 	return filtered, "hnsw_post_filter", count, nil
 }
 

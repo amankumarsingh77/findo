@@ -29,7 +29,13 @@ func RelaxationLadder(
 	spec query.FilterSpec,
 	k int,
 ) (results []store.SearchResult, droppedDesc string, err error) {
+	logger := planner.logger
 	current := copyFilterSpec(spec)
+	logger.Debug("relaxation: starting ladder",
+		"must_clauses", len(spec.Must),
+		"must_not_clauses", len(spec.MustNot),
+		"semantic_query", spec.SemanticQuery,
+	)
 
 	for {
 		var strategy string
@@ -41,6 +47,7 @@ func RelaxationLadder(
 			return nil, droppedDesc, err
 		}
 		if len(results) > 0 {
+			logger.Debug("relaxation: found results", "results", len(results), "dropped_desc", droppedDesc)
 			return results, droppedDesc, nil
 		}
 
@@ -52,6 +59,11 @@ func RelaxationLadder(
 
 		// Record the description of what we're dropping.
 		droppedDesc = mustClauseDesc(current.Must[idx])
+		logger.Debug("relaxation: dropping must clause",
+			"field", current.Must[idx].Field,
+			"description", droppedDesc,
+			"remaining_must", len(current.Must)-1,
+		)
 
 		// Remove the clause.
 		current.Must = removeMustClause(current.Must, idx)
@@ -59,6 +71,10 @@ func RelaxationLadder(
 
 	// Final fallback: pure semantic (empty spec, preserve SemanticQuery and MustNot).
 	if len(results) == 0 {
+		logger.Debug("relaxation: all must clauses dropped, falling back to pure semantic",
+			"semantic_query", spec.SemanticQuery,
+			"must_not_preserved", len(spec.MustNot),
+		)
 		emptySpec := query.FilterSpec{
 			SemanticQuery: spec.SemanticQuery,
 			MustNot:       spec.MustNot, // MustNot is never dropped
@@ -71,6 +87,7 @@ func RelaxationLadder(
 		if droppedDesc == "" {
 			droppedDesc = "all filters"
 		}
+		logger.Debug("relaxation: semantic fallback complete", "results", len(results))
 	}
 
 	return results, droppedDesc, err

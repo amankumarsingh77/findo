@@ -78,7 +78,7 @@ type App struct {
 	hotkeyMgr     *desktop.HotkeyManager
 	trayIcon      []byte
 	windowMu      sync.Mutex
-	apiKeyMu      sync.Mutex // serialises concurrent SetGeminiAPIKey calls
+	apiKeyMu      sync.RWMutex // guards a.embedder and a.llmParser: write on SetGeminiAPIKey, read on ParseQuery/SearchWithFilters
 	windowVisible bool
 
 	saveTimerMu sync.Mutex
@@ -954,7 +954,13 @@ func (a *App) ParseQuery(raw string) (ParseQueryResult, error) {
 		return ParseQueryResult{}, nil
 	}
 
-	offline := a.isOfflineMode()
+	// Snapshot embedder-related fields under read lock to avoid data races with
+	// concurrent SetGeminiAPIKey calls.
+	a.apiKeyMu.RLock()
+	llmParser := a.llmParser
+	offline := a.embedder == nil
+	a.apiKeyMu.RUnlock()
+
 	a.logger.Debug("parse_query: start", "raw", raw, "offline", offline)
 
 	// Grammar parse — always, no network.
@@ -990,11 +996,11 @@ func (a *App) ParseQuery(raw string) (ParseQueryResult, error) {
 		}
 		llmSpec := grammarSpec
 		// Skip LLM when offline.
-		shouldInvoke := !offline && query.ShouldInvokeLLM(grammarSpec.SemanticQuery) && a.llmParser != nil && a.ctx != nil
+		shouldInvoke := !offline && query.ShouldInvokeLLM(grammarSpec.SemanticQuery) && llmParser != nil && a.ctx != nil
 		a.logger.Debug("parse_query: LLM invocation decision",
 			"should_invoke", shouldInvoke,
 			"offline", offline,
-			"llm_available", a.llmParser != nil,
+			"llm_available", llmParser != nil,
 			"trigger_result", query.ShouldInvokeLLM(grammarSpec.SemanticQuery),
 		)
 		if shouldInvoke {
@@ -1002,7 +1008,7 @@ func (a *App) ParseQuery(raw string) (ParseQueryResult, error) {
 			defer cancel()
 			llmStart := time.Now()
 			a.logger.Debug("parse_query: invoking LLM parser")
-			parsed, err := a.llmParser.Parse(ctx, raw, grammarSpec)
+			parsed, err := llmParser.Parse(ctx, raw, grammarSpec)
 			elapsed := time.Since(llmStart).Milliseconds()
 			if a.queryStats != nil {
 				a.queryStats.recordLLMCall(elapsed)
@@ -1061,8 +1067,11 @@ func (a *App) SearchWithFilters(raw string, semanticQuery string, denyList []str
 		return SearchWithFiltersResult{Results: results}, err
 	}
 
-	// Offline mode: skip embedding entirely, use filename search.
-	isOffline := a.isOfflineMode()
+	// Snapshot embedder state under read lock to avoid races with concurrent SetGeminiAPIKey.
+	a.apiKeyMu.RLock()
+	isOffline := a.embedder == nil
+	a.apiKeyMu.RUnlock()
+
 	a.logger.Debug("search_with_filters: start", "raw", raw, "offline", isOffline, "deny_list_len", len(denyList))
 	if isOffline {
 		a.logger.Debug("search_with_filters: offline mode, using filename search only")
@@ -1132,7 +1141,8 @@ func (a *App) SearchWithFilters(raw string, semanticQuery string, denyList []str
 	a.logger.Debug("search_with_filters: embedding query", "query_text", queryText)
 	queryVec, err := a.getQueryVector(queryText)
 	if err != nil {
-		return SearchWithFiltersResult{}, err
+		a.logger.Warn("search_with_filters: embedding failed, falling back to filename search", "error", err)
+		return a.searchFilenameOnly(queryText)
 	}
 	a.logger.Debug("search_with_filters: query embedded, running search engine",
 		"must", len(mergedSpec.Must),
@@ -1371,7 +1381,9 @@ func clauseToChip(c query.Clause, negate bool, clauseType string) (ChipDTO, bool
 		label = "Not " + label
 	}
 
-	clauseKey := fmt.Sprintf("%s|%s|%s", c.Field, c.Op, valueStr)
+	// Use fmt.Sprintf("%v", c.Value) to match merge.go's clauseValueString serialization
+	// so that denylist lookups resolve correctly for all value types (e.g. []string in_set).
+	clauseKey := fmt.Sprintf("%s|%s|%v", c.Field, c.Op, c.Value)
 
 	return ChipDTO{
 		Label:      label,

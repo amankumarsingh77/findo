@@ -428,7 +428,7 @@ func (p *Pipeline) indexFile(filePath string, force bool) error {
 		return nil
 	}
 
-	ext := filepath.Ext(filePath)
+	ext := strings.ToLower(filepath.Ext(filePath))
 	p.logger.Debug("indexing file", "path", filePath, "type", string(fileType), "size", info.Size(), "chunks", len(chunks))
 
 	thumbPath, thumbErr := GenerateThumbnail(filePath, p.thumbDir, string(fileType))

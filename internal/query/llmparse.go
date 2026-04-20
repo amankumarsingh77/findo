@@ -3,7 +3,6 @@ package query
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -106,20 +105,7 @@ func (p *LLMParser) Parse(ctx context.Context, query string, grammarSpec FilterS
 		return grammarSpec, nil
 	}
 
-	today := time.Now().Format("2006-01-02")
-	systemPrompt := fmt.Sprintf(
-		`You convert a file search query into a structured filter. Today is %s.
-Return JSON matching the schema. Only use the fields listed (file_type, extension,
-size_bytes, modified_at, path, semantic_contains). Never invent fields.
-
-Rules:
-- Temporal constraints (modified_at) MUST go in "must", never "should".
-- For date ranges like "last week", emit TWO must clauses: one "gte" for the start and one "lte" for the end.
-- File type / extension hints go in "should" with boost=1.5.
-- Set semantic_query to the non-filter portion of the query (e.g. "photos" not "photos from last week").
-- Use ISO-8601 UTC timestamps for modified_at values (e.g. "2026-03-29T00:00:00Z").`,
-		today,
-	)
+	systemPrompt := buildSystemPrompt(time.Now())
 
 	config := &genai.GenerateContentConfig{
 		SystemInstruction: &genai.Content{Parts: []*genai.Part{{Text: systemPrompt}}},

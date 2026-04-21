@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { GetFilePreview } from '../../../wailsjs/go/main/App';
+import { GetFilePreview } from '../../../wailsjs/go/app/App';
 
 interface Props {
   filePath: string;

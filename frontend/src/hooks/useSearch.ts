@@ -1,6 +1,6 @@
 import { useReducer, useState, useEffect, useRef, useCallback } from 'react';
-import { PreEmbedQuery, ParseQuery, SearchWithFilters } from '../../wailsjs/go/main/App';
-import { main } from '../../wailsjs/go/models';
+import { PreEmbedQuery, ParseQuery, SearchWithFilters } from '../../wailsjs/go/app/App';
+import { app } from '../../wailsjs/go/models';
 import {
   searchReducer,
   initialSearchState,
@@ -8,7 +8,7 @@ import {
 } from '../state/searchReducer';
 import { applyClientSideFilters } from '../utils/filterResults';
 
-export type SearchResultDTO = main.SearchResultDTO;
+export type SearchResultDTO = app.SearchResultDTO;
 
 const CLIENT_FILTER_MIN_RESULTS = 5;
 

@@ -1,7 +1,7 @@
-import { main } from '../../wailsjs/go/models'
+import { app } from '../../wailsjs/go/models'
 
-type SearchResultDTO = main.SearchResultDTO
-type ChipDTO = main.ChipDTO
+type SearchResultDTO = app.SearchResultDTO
+type ChipDTO = app.ChipDTO
 
 function evaluateStringOp(fieldVal: string, op: string, value: string): boolean {
   switch (op) {

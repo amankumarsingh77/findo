@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { SetGeminiAPIKey, GetHasGeminiKey } from '../../wailsjs/go/main/App';
+import { SetGeminiAPIKey, GetHasGeminiKey } from '../../wailsjs/go/app/App';
 
 interface ApiKeyDialogProps {
   onClose: () => void;

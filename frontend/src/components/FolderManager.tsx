@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { GetFolders, RemoveFolder, AddIgnoredFolder, GetIgnoredFolders, RemoveIgnoredFolder, ReindexFolder, PickAndAddFolder } from '../../wailsjs/go/main/App';
+import { GetFolders, RemoveFolder, AddIgnoredFolder, GetIgnoredFolders, RemoveIgnoredFolder, ReindexFolder, PickAndAddFolder } from '../../wailsjs/go/app/App';
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
 import { useHideSuppression } from '../hooks/useHideSuppression';
 

@@ -13,7 +13,7 @@ import { useSearch } from './hooks/useSearch';
 import { useIndexingStatus } from './hooks/useIndexingStatus';
 import { useHideSuppression } from './hooks/useHideSuppression';
 import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime';
-import { OpenFile, OpenFolder, HideWindow, GetFolders, GetHasGeminiKey, GetOnboarded, MarkOnboarded, ReindexNow } from '../wailsjs/go/main/App';
+import { OpenFile, OpenFolder, HideWindow, GetFolders, GetHasGeminiKey, GetOnboarded, MarkOnboarded, ReindexNow } from '../wailsjs/go/app/App';
 
 function App() {
   const {

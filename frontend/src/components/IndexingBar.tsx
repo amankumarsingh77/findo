@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PauseIndexing, ResumeIndexing } from '../../wailsjs/go/main/App';
+import { PauseIndexing, ResumeIndexing } from '../../wailsjs/go/app/App';
 import type { IndexingStatus } from '../hooks/useIndexingStatus';
 
 interface IndexingBarProps {

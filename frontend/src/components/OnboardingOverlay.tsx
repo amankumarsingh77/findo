@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetHotkeyString } from '../../wailsjs/go/main/App';
+import { GetHotkeyString } from '../../wailsjs/go/app/App';
 
 interface Props {
   onDismiss: () => void;

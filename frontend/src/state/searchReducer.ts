@@ -1,6 +1,6 @@
-import type { main } from '../../wailsjs/go/models'
+import type { app } from '../../wailsjs/go/models'
 
-export type ChipDTO = main.ChipDTO
+export type ChipDTO = app.ChipDTO
 
 export type SearchPhase = 'idle' | 'typing' | 'grammar_parsed' | 'llm_pending' | 'llm_parsed' | 'relaxed'
 

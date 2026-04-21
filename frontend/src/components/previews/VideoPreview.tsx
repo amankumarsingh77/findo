@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GetPreviewClipPath } from '../../../wailsjs/go/main/App';
+import { GetPreviewClipPath } from '../../../wailsjs/go/app/App';
 import type { SearchResultDTO } from '../../hooks/useSearch';
 
 interface VideoPreviewProps {

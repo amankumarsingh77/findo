@@ -1,4 +1,4 @@
-import { ReindexNow } from '../../wailsjs/go/main/App';
+import { ReindexNow } from '../../wailsjs/go/app/App';
 
 interface ReindexBannerProps {
   errorCode: string;

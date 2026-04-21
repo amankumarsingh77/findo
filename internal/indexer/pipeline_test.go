@@ -17,6 +17,32 @@ import (
 	"universal-search/internal/vectorstore"
 )
 
+// directQueryModelDims bypasses the Store API to pull embedding_model and
+// embedding_dims columns for assertions in TestPipeline_WritesModelAndDims.
+type modelDimsRow struct {
+	model string
+	dims  int
+}
+
+func directQueryModelDims(t *testing.T, s *store.Store) ([]modelDimsRow, error) {
+	t.Helper()
+	db := store.DBForTesting(s)
+	rows, err := db.Query(`SELECT embedding_model, embedding_dims FROM chunks`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []modelDimsRow
+	for rows.Next() {
+		var r modelDimsRow
+		if err := rows.Scan(&r.model, &r.dims); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 // mockEmbedder is a fake Embedder used in pipeline tests.
 // It implements the embedder interface expected by indexFile.
 type mockEmbedder struct {
@@ -1173,6 +1199,100 @@ func TestIndexer_VectorBlobMatchesEmbedding(t *testing.T) {
 	for i, want := range expected {
 		if decoded[i] != want {
 			t.Fatalf("decoded[%d]=%v, want %v", i, decoded[i], want)
+		}
+	}
+}
+
+// TestNewPipeline_HonoursConfig verifies NewPipeline applies PipelineConfig
+// — workers=1, queue=4, saveEveryN=3 (REF-041).
+func TestNewPipeline_HonoursConfig(t *testing.T) {
+	cfg := PipelineConfig{Workers: 1, JobQueueSize: 4, SaveEveryN: 3}
+	p, _, _ := newTestPipelineWithMock(t, &mockEmbedder{}, nil, cfg.Workers)
+	defer p.Stop()
+
+	if p.workerCount != 1 {
+		t.Errorf("workerCount: got %d, want 1", p.workerCount)
+	}
+
+	def := DefaultPipelineConfig()
+	if def.Workers != 4 || def.JobQueueSize != 64 || def.SaveEveryN != 50 {
+		t.Errorf("DefaultPipelineConfig mismatch: %+v", def)
+	}
+}
+
+// TestNewPipeline_SaveEveryNFromConfig verifies SaveEveryN is plumbed from cfg
+// into the pipeline field (REF-041).
+func TestNewPipeline_SaveEveryNFromConfig(t *testing.T) {
+	cfg := PipelineConfig{Workers: 1, JobQueueSize: 4, SaveEveryN: 3}
+	p, _, _ := newTestPipelineWithMock(t, &mockEmbedder{}, nil, cfg.Workers)
+	p.saveEveryN = cfg.SaveEveryN
+	defer p.Stop()
+
+	if p.saveEveryN != 3 {
+		t.Fatalf("saveEveryN: got %d, want 3", p.saveEveryN)
+	}
+}
+
+// TestPipeline_WritesModelAndDims verifies storeChunks populates
+// embedding_model and embedding_dims on every chunk row, sourced from the
+// pipeline's embedder (REF-060).
+func TestPipeline_WritesModelAndDims(t *testing.T) {
+	dir := t.TempDir()
+	fpath := filepath.Join(dir, "hello.txt")
+	if err := os.WriteFile(fpath, []byte("hello world from the pipeline"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	mock := &mockEmbedder{}
+	p, s, _ := newTestPipelineWithMock(t, mock, nil, 1)
+	defer p.Stop()
+
+	p.SubmitFile(fpath)
+
+	deadline := time.After(5 * time.Second)
+	for {
+		mock.mu.Lock()
+		calls := mock.batchCallCount
+		mock.mu.Unlock()
+		if calls >= 1 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("embed batch never called")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
+	deadline = time.After(5 * time.Second)
+	for {
+		if p.Status().IndexedFiles >= 1 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("file not indexed: %+v", p.Status())
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+
+	rows, err := s.GetAllChunks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) == 0 {
+		t.Fatal("no chunks inserted")
+	}
+	dbRows, err := directQueryModelDims(t, s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range dbRows {
+		if r.model != "mock" {
+			t.Errorf("embedding_model = %q, want %q", r.model, "mock")
+		}
+		if r.dims != 3 {
+			t.Errorf("embedding_dims = %d, want 3", r.dims)
 		}
 	}
 }

@@ -6,8 +6,8 @@ import * as path from "node:path";
 
 function getBinaryPath(): string {
   const candidates = [
-    path.join(__dirname, "..", "build", "bin", "universal-search"),
-    path.join(__dirname, "..", "build", "bin", "universal-search.app", "Contents", "MacOS", "universal-search"),
+    path.join(__dirname, "..", "build", "bin", "findo"),
+    path.join(__dirname, "..", "build", "bin", "findo.app", "Contents", "MacOS", "findo"),
   ];
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
@@ -28,7 +28,7 @@ test.beforeAll(async () => {
     { name: "main.go", content: "package main\n\nfunc main() {}" },
     { name: "notes.md", content: "# Meeting notes\n\nAction items for next sprint" },
     { name: "data.json", content: '{"key": "value", "items": [1, 2, 3]}' },
-    { name: "readme.txt", content: "Installation instructions for universal search" },
+    { name: "readme.txt", content: "Installation instructions for findo" },
     { name: "budget.txt", content: "annual budget planning spreadsheet data" },
     { name: "design.md", content: "# Design spec\n\nArchitecture overview" },
     { name: "config.go", content: "package config\n\ntype Config struct{}" },

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"universal-search/internal/apperr"
-	"universal-search/internal/query"
+	"findo/internal/apperr"
+	"findo/internal/query"
 )
 
 // SearchWithFilters runs a search using the parsed FilterSpec, applying a

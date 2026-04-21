@@ -1,5 +1,5 @@
 {
-  "name": "universal-search",
+  "name": "findo",
   "private": true,
   "scripts": {
     "prepare": "husky"

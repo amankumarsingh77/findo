@@ -12,11 +12,11 @@ import (
 //   - Colored text to stderr at Info level (for terminal)
 //   - JSON to a rotated log file at Debug level (for troubleshooting)
 //
-// The log file is written to <dataDir>/universal-search.log with rotation:
+// The log file is written to <dataDir>/findo.log with rotation:
 // 50 MB max size, 3 backups, 28 days retention, gzip compression.
 func New(dataDir string) *slog.Logger {
 	fileWriter := &lumberjack.Logger{
-		Filename:   filepath.Join(dataDir, "universal-search.log"),
+		Filename:   filepath.Join(dataDir, "findo.log"),
 		MaxSize:    50, // megabytes
 		MaxBackups: 3,
 		MaxAge:     28, // days

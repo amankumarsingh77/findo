@@ -16,10 +16,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"universal-search/internal/chunker"
-	"universal-search/internal/embedder"
-	"universal-search/internal/store"
-	"universal-search/internal/vectorstore"
+	"findo/internal/chunker"
+	"findo/internal/embedder"
+	"findo/internal/store"
+	"findo/internal/vectorstore"
 )
 
 // IndexStatus is a point-in-time snapshot of indexing progress and state.

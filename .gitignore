@@ -1,6 +1,7 @@
 build/bin
 node_modules
 frontend/dist
+design/
 docs/
 data/
 .env

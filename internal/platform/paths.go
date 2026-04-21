@@ -34,8 +34,24 @@ func DataDir() (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported OS: %s", runtime.GOOS)
 	}
-	dir := filepath.Join(base, "universal-search")
+	dir := filepath.Join(base, "findo")
+	migrateLegacyDataDir(base, dir)
 	return dir, os.MkdirAll(dir, 0o755)
+}
+
+// migrateLegacyDataDir renames the pre-rename "universal-search" data directory
+// to "findo" on first launch if the new directory does not already exist. A
+// best-effort migration — any failure is silent and falls through to a fresh
+// start at the new path.
+func migrateLegacyDataDir(base, newDir string) {
+	legacy := filepath.Join(base, "universal-search")
+	if _, err := os.Stat(legacy); err != nil {
+		return
+	}
+	if _, err := os.Stat(newDir); err == nil {
+		return
+	}
+	_ = os.Rename(legacy, newDir)
 }
 
 // DBPath returns the absolute path to the SQLite metadata database file.

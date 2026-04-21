@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"universal-search/internal/apperr"
-	"universal-search/internal/config"
+	"findo/internal/apperr"
+	"findo/internal/config"
 )
 
 // TestApp_SetBaseContext_StoresContext verifies SetBaseContext stores ctx for startup use.

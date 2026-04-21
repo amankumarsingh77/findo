@@ -1,8 +1,8 @@
 package app
 
 import (
-	"universal-search/internal/embedder"
-	"universal-search/internal/query"
+	"findo/internal/embedder"
+	"findo/internal/query"
 )
 
 // snapshotEmbedderState returns the currently installed embedder and LLM parser

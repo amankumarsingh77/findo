@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"universal-search/internal/store"
+	"findo/internal/store"
 )
 
 // FilenameStore is the subset of store.Store used for filename matching.

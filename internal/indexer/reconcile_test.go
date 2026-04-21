@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"universal-search/internal/store"
+	"findo/internal/store"
 )
 
 // TestReconcileIndex_NoChunks — empty DB → ReconcileIndex completes without error,

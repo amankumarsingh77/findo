@@ -10,18 +10,18 @@ import (
 	"sync"
 	"time"
 
-	"universal-search/internal/apperr"
-	"universal-search/internal/config"
-	"universal-search/internal/desktop"
-	"universal-search/internal/embedder"
-	"universal-search/internal/indexer"
-	"universal-search/internal/logger"
-	"universal-search/internal/platform"
-	"universal-search/internal/query"
-	"universal-search/internal/search"
-	"universal-search/internal/store"
-	"universal-search/internal/vectorstore"
-	"universal-search/internal/watcher"
+	"findo/internal/apperr"
+	"findo/internal/config"
+	"findo/internal/desktop"
+	"findo/internal/embedder"
+	"findo/internal/indexer"
+	"findo/internal/logger"
+	"findo/internal/platform"
+	"findo/internal/query"
+	"findo/internal/search"
+	"findo/internal/store"
+	"findo/internal/vectorstore"
+	"findo/internal/watcher"
 
 	"errors"
 
@@ -135,8 +135,8 @@ func FolderAllowed(a *App, filePath string) bool {
 func ShowAboutDialog(a *App) {
 	runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
 		Type:    runtime.InfoDialog,
-		Title:   "Universal Search",
-		Message: "Universal Search — fast local file search powered by vector embeddings.",
+		Title:   "Findo",
+		Message: "Findo — fast local file search powered by vector embeddings.",
 	})
 }
 
@@ -165,7 +165,7 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.logger = logger.New(dataDir)
 	log := a.logger.WithGroup("app")
-	log.Info("starting Universal Search")
+	log.Info("starting Findo")
 
 	dbPath, err := platform.DBPath()
 	if err != nil {

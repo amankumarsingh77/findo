@@ -12,9 +12,9 @@ import (
 	"strings"
 	"syscall"
 
-	"universal-search/internal/app"
-	"universal-search/internal/config"
-	"universal-search/internal/platform"
+	"findo/internal/app"
+	"findo/internal/config"
+	"findo/internal/platform"
 
 	"github.com/joho/godotenv"
 	"github.com/wailsapp/wails/v2"
@@ -114,9 +114,9 @@ func main() {
 	// Build application menu.
 	appMenu := menu.NewMenu()
 
-	// "Universal Search" app menu
-	appSubMenu := appMenu.AddSubmenu("Universal Search")
-	appSubMenu.AddText("About Universal Search", nil, func(_ *menu.CallbackData) {
+	// "Findo" app menu
+	appSubMenu := appMenu.AddSubmenu("Findo")
+	appSubMenu.AddText("About Findo", nil, func(_ *menu.CallbackData) {
 		app.ShowAboutDialog(a)
 	})
 	appSubMenu.AddSeparator()
@@ -150,7 +150,7 @@ func main() {
 	appMenu.Append(menu.EditMenu())
 
 	err = wails.Run(&options.App{
-		Title:     "Universal Search",
+		Title:     "Findo",
 		Width:     960,
 		Height:    600,
 		MinWidth:  680,

@@ -37,16 +37,16 @@ func (t *TrayManager) Stop() {
 
 func (t *TrayManager) onReady() {
 	systray.SetIcon(t.icon)
-	systray.SetTitle("Universal Search")
+	systray.SetTitle("Findo")
 	hotkeyStr := t.app.GetHotkeyString()
-	systray.SetTooltip("Universal Search — " + hotkeyStr)
+	systray.SetTooltip("Findo — " + hotkeyStr)
 
 	showHide := systray.AddMenuItem("Show/Hide", "Toggle search window")
 	systray.AddSeparator()
 	reindex := systray.AddMenuItem("Re-index Now", "Re-index all folders")
 	folders := systray.AddMenuItem("Manage Folders...", "Add or remove indexed folders")
 	systray.AddSeparator()
-	quit := systray.AddMenuItem("Quit", "Quit Universal Search")
+	quit := systray.AddMenuItem("Quit", "Quit Findo")
 
 	showHide.Click(func() { t.app.ToggleWindow() })
 	reindex.Click(func() { t.app.ReindexNow() })

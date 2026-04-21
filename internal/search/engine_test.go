@@ -5,10 +5,10 @@ import (
 	"log/slog"
 	"testing"
 
-	"universal-search/internal/apperr"
-	"universal-search/internal/query"
-	"universal-search/internal/store"
-	"universal-search/internal/vectorstore"
+	"findo/internal/apperr"
+	"findo/internal/query"
+	"findo/internal/store"
+	"findo/internal/vectorstore"
 )
 
 var testLogger = slog.New(slog.NewTextHandler(io.Discard, nil))

@@ -4,8 +4,8 @@ import (
 	"sort"
 	"time"
 
-	"universal-search/internal/query"
-	"universal-search/internal/store"
+	"findo/internal/query"
+	"findo/internal/store"
 )
 
 // RerankerConfig holds tunables for Rerank scoring.

@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"universal-search/internal/query"
-	"universal-search/internal/store"
-	"universal-search/internal/vectorstore"
+	"findo/internal/query"
+	"findo/internal/store"
+	"findo/internal/vectorstore"
 )
 
 // mockPlannerStore is a controllable store for relaxation tests.

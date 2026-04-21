@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 
-	"universal-search/internal/indexer"
-	"universal-search/internal/platform"
+	"findo/internal/indexer"
+	"findo/internal/platform"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )

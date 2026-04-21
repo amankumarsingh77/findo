@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"universal-search/internal/chunker"
-	"universal-search/internal/store"
+	"findo/internal/chunker"
+	"findo/internal/store"
 )
 
 // ReconcileIndex queries all chunk vector IDs from SQLite and re-queues any file

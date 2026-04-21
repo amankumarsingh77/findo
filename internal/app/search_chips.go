@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"universal-search/internal/query"
-	"universal-search/internal/store"
+	"findo/internal/query"
+	"findo/internal/store"
 )
 
 // toSearchResultDTO converts a store.SearchResult to a SearchResultDTO.

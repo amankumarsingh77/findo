@@ -16,7 +16,7 @@ func TestResolve_Platform(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Resolve: %v", err)
 		}
-		want := filepath.Join(`C:\FakeAppData`, "universal-search", "config.toml")
+		want := filepath.Join(`C:\FakeAppData`, "findo", "config.toml")
 		if got != want {
 			t.Fatalf("Resolve() = %q, want %q", got, want)
 		}
@@ -29,7 +29,7 @@ func TestResolve_Platform(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
-	want := filepath.Join(fakeHome, ".config", "universal-search", "config.toml")
+	want := filepath.Join(fakeHome, ".config", "findo", "config.toml")
 	if got != want {
 		t.Fatalf("Resolve() = %q, want %q", got, want)
 	}

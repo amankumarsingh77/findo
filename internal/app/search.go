@@ -8,8 +8,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"universal-search/internal/apperr"
-	"universal-search/internal/query"
+	"findo/internal/apperr"
+	"findo/internal/query"
 )
 
 // Search embeds the query via Gemini and returns the top search results.

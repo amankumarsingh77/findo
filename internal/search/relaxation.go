@@ -3,8 +3,8 @@ package search
 import (
 	"context"
 
-	"universal-search/internal/query"
-	"universal-search/internal/store"
+	"findo/internal/query"
+	"findo/internal/store"
 )
 
 // LadderConfig holds the relaxation ladder settings.

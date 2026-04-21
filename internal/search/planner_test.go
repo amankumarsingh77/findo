@@ -3,9 +3,9 @@ package search
 import (
 	"testing"
 
-	"universal-search/internal/query"
-	"universal-search/internal/store"
-	"universal-search/internal/vectorstore"
+	"findo/internal/query"
+	"findo/internal/store"
+	"findo/internal/vectorstore"
 )
 
 // --- helpers ---

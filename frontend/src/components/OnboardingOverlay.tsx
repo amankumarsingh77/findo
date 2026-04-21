@@ -16,7 +16,7 @@ export function OnboardingOverlay({ onDismiss }: Props) {
     <div style={overlayStyle}>
       <div style={cardStyle}>
         <h2 style={{ margin: '0 0 12px', fontSize: '18px', fontWeight: 600 }}>
-          Welcome to Universal Search
+          Welcome to Findo
         </h2>
         <p style={{ margin: '0 0 8px', color: 'var(--text-secondary, #aaa)', fontSize: '14px' }}>
           Search your files instantly from anywhere.

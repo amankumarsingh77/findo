@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"universal-search/internal/query"
-	"universal-search/internal/store"
+	"findo/internal/query"
+	"findo/internal/store"
 )
 
 // TestRerank_ShouldBoostApplied verifies that a Should clause with Boost=1.5

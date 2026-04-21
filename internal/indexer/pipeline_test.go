@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"universal-search/internal/embedder"
-	"universal-search/internal/store"
-	"universal-search/internal/vectorstore"
+	"findo/internal/embedder"
+	"findo/internal/store"
+	"findo/internal/vectorstore"
 )
 
 // directQueryModelDims bypasses the Store API to pull embedding_model and

@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"universal-search/internal/apperr"
-	"universal-search/internal/embedder"
-	"universal-search/internal/query"
-	"universal-search/internal/search"
-	"universal-search/internal/store"
-	"universal-search/internal/vectorstore"
+	"findo/internal/apperr"
+	"findo/internal/embedder"
+	"findo/internal/query"
+	"findo/internal/search"
+	"findo/internal/store"
+	"findo/internal/vectorstore"
 )
 
 var e2eLogger = slog.New(slog.NewTextHandler(io.Discard, nil))

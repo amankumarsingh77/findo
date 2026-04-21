@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"universal-search/internal/chunker"
-	"universal-search/internal/embedder"
-	"universal-search/internal/store"
+	"findo/internal/chunker"
+	"findo/internal/embedder"
+	"findo/internal/store"
 )
 
 func TestCheckStale_Unchanged(t *testing.T) {

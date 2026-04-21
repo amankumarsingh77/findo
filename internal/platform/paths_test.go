@@ -13,8 +13,8 @@ func TestDataDir_ReturnsNonEmptyPath(t *testing.T) {
 	if dir == "" {
 		t.Fatal("DataDir returned empty string")
 	}
-	if !strings.Contains(dir, "universal-search") {
-		t.Fatalf("DataDir should contain 'universal-search', got: %s", dir)
+	if !strings.Contains(dir, "findo") {
+		t.Fatalf("DataDir should contain 'findo', got: %s", dir)
 	}
 }
 

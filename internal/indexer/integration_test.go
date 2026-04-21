@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"universal-search/internal/store"
-	"universal-search/internal/vectorstore"
+	"findo/internal/store"
+	"findo/internal/vectorstore"
 )
 
 // newTestComponents returns a store backed by an in-memory SQLite DB, a fresh

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"universal-search/internal/store"
+	"findo/internal/store"
 )
 
 // TestMerger_DisabledReturnsSemanticOnly verifies that when Merger.Enabled=false,

@@ -118,13 +118,13 @@ var ErrInvalidConfig = errors.New("invalid config")
 func Resolve() (string, error) {
 	if runtime.GOOS == "windows" {
 		appdata := os.Getenv("APPDATA")
-		return filepath.Join(appdata, "universal-search", "config.toml"), nil
+		return filepath.Join(appdata, "findo", "config.toml"), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".config", "universal-search", "config.toml"), nil
+	return filepath.Join(home, ".config", "findo", "config.toml"), nil
 }
 
 // Load reads a config TOML file, merges it over embedded defaults, runs any

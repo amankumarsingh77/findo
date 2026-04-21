@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"universal-search/internal/apperr"
-	"universal-search/internal/chunker"
+	"findo/internal/apperr"
+	"findo/internal/chunker"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )

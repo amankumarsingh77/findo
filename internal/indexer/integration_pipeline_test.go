@@ -17,9 +17,9 @@ import (
 
 	_ "github.com/ncruces/go-sqlite3/driver"
 
-	"universal-search/internal/embedder"
-	"universal-search/internal/store"
-	"universal-search/internal/vectorstore"
+	"findo/internal/embedder"
+	"findo/internal/store"
+	"findo/internal/vectorstore"
 )
 
 var intLogger = slog.New(slog.NewTextHandler(io.Discard, nil))

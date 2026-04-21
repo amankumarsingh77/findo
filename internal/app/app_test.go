@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"universal-search/internal/config"
-	"universal-search/internal/indexer"
-	"universal-search/internal/query"
-	"universal-search/internal/search"
-	"universal-search/internal/store"
-	"universal-search/internal/vectorstore"
+	"findo/internal/config"
+	"findo/internal/indexer"
+	"findo/internal/query"
+	"findo/internal/search"
+	"findo/internal/store"
+	"findo/internal/vectorstore"
 )
 
 

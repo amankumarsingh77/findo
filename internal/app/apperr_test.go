@@ -6,13 +6,13 @@ import (
 	"log/slog"
 	"testing"
 
-	"universal-search/internal/apperr"
-	"universal-search/internal/config"
-	"universal-search/internal/embedder"
-	"universal-search/internal/query"
-	"universal-search/internal/search"
-	"universal-search/internal/store"
-	"universal-search/internal/vectorstore"
+	"findo/internal/apperr"
+	"findo/internal/config"
+	"findo/internal/embedder"
+	"findo/internal/query"
+	"findo/internal/search"
+	"findo/internal/store"
+	"findo/internal/vectorstore"
 )
 
 // failingEmbedder is an Embedder that always fails with a non-retriable error.

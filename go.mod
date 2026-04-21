@@ -1,4 +1,4 @@
-module universal-search
+module findo
 
 go 1.26.0
 

@@ -6,10 +6,10 @@ import (
 	"os"
 	"testing"
 
-	"universal-search/internal/config"
-	"universal-search/internal/indexer"
-	"universal-search/internal/store"
-	"universal-search/internal/vectorstore"
+	"findo/internal/config"
+	"findo/internal/indexer"
+	"findo/internal/store"
+	"findo/internal/vectorstore"
 )
 
 func newTestAppFull(t *testing.T) *App {

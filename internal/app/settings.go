@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"universal-search/internal/apperr"
-	"universal-search/internal/desktop"
-	"universal-search/internal/embedder"
-	"universal-search/internal/query"
-	"universal-search/internal/search"
+	"findo/internal/apperr"
+	"findo/internal/desktop"
+	"findo/internal/embedder"
+	"findo/internal/query"
+	"findo/internal/search"
 )
 
 // GetSetting returns the persisted value for a key-value setting, or empty if unset.

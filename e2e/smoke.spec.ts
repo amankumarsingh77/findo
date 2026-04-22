@@ -103,3 +103,82 @@ test("preview panel loads for text file", async ({ page }) => {
   await expect(page.locator('[data-testid="preview-panel"]')).toBeVisible({ timeout: 3_000 });
   await expect(page.locator('[data-testid="preview-panel"]')).toContainText("Installation");
 });
+
+// ---------------------------------------------------------------------------
+// Failures modal smoke test
+//
+// This test requires a locally built Wails binary and exercises the
+// indexing-failure-visibility feature end-to-end. It does NOT run by default
+// in CI because it needs the built app binary and takes 30+ seconds.
+//
+// To run locally:
+//   E2E_FAILURES_MODAL=1 npx playwright test e2e/smoke.spec.ts --grep "failures modal"
+// ---------------------------------------------------------------------------
+const runFailuresModal = process.env["E2E_FAILURES_MODAL"] === "1";
+
+test.describe.configure({ mode: "serial" });
+
+(runFailuresModal ? test.describe : test.describe.skip)(
+  "failures modal — requires local binary (E2E_FAILURES_MODAL=1)",
+  () => {
+    let failTempDir: string;
+
+    test.beforeAll(async () => {
+      // Create a dedicated temp directory with a file that has an unsupported
+      // extension (.xyz). The chunker registry has no handler for .xyz so the
+      // pipeline records an ERR_UNSUPPORTED_FORMAT terminal failure.
+      failTempDir = fs.mkdtempSync(path.join(os.tmpdir(), "us-e2e-fail-"));
+      fs.writeFileSync(
+        path.join(failTempDir, "unsupported.xyz"),
+        "this file type is not in the chunker registry",
+      );
+    });
+
+    test.afterAll(async () => {
+      fs.rmSync(failTempDir, { recursive: true, force: true });
+    });
+
+    test("failures modal shows View button and lists the failed file", async ({ page }) => {
+      await page.goto("http://localhost:34115");
+
+      // Add the folder containing the unsupported file so the pipeline indexes it.
+      await page.evaluate((dir) => {
+        return (window as any).go.main.App.AddFolder(dir);
+      }, failTempDir);
+
+      // Wait until at least one failure is recorded (up to 60 s).
+      await page.waitForFunction(
+        async () => {
+          const status = await (window as any).go.main.App.GetIndexStatus();
+          return (status.FailedFiles ?? status.failedFiles ?? 0) > 0;
+        },
+        { timeout: 60_000 },
+      );
+
+      // The "View" button appears inside the IndexingBar whenever failedFiles > 0.
+      const viewButton = page.getByRole("button", { name: "View" });
+      await expect(viewButton).toBeVisible({ timeout: 5_000 });
+
+      // Click "View" — the FailuresModal should open.
+      await viewButton.click();
+
+      // Modal is identified by its aria-label.
+      const modal = page.getByRole("dialog", { name: "Indexing failures" });
+      await expect(modal).toBeVisible({ timeout: 5_000 });
+
+      // At least one group row should show the "Unsupported format" label.
+      const groupLabel = modal.getByText("Unsupported format");
+      await expect(groupLabel).toBeVisible({ timeout: 5_000 });
+
+      // Expand the group by clicking its header button.
+      await modal.getByRole("button", { name: /Unsupported format/ }).click();
+
+      // After expanding, the failed filename should be visible in the detail rows.
+      await expect(modal.getByText("unsupported.xyz")).toBeVisible({ timeout: 5_000 });
+
+      // Close the modal via the footer "Close" button.
+      await modal.getByRole("button", { name: "Close" }).click();
+      await expect(modal).not.toBeVisible({ timeout: 3_000 });
+    });
+  },
+);

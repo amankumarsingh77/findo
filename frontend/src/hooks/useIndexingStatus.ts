@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
 
+export interface FailureGroup {
+  code: string;
+  label: string;
+  count: number;
+  sampleFiles: string[];
+}
+
 export interface IndexingStatus {
   totalFiles: number;
   indexedFiles: number;
@@ -10,6 +17,8 @@ export interface IndexingStatus {
   paused: boolean;
   quotaPaused: boolean;
   quotaResumeAt: string;
+  pendingRetryFiles: number;
+  failedFileGroups: FailureGroup[];
 }
 
 const defaultStatus: IndexingStatus = {
@@ -21,6 +30,8 @@ const defaultStatus: IndexingStatus = {
   paused: false,
   quotaPaused: false,
   quotaResumeAt: '',
+  pendingRetryFiles: 0,
+  failedFileGroups: [],
 };
 
 export function useIndexingStatus() {

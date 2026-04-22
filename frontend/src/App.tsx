@@ -4,6 +4,7 @@ import { ResultsList } from './components/ResultsList';
 import { EmptyState } from './components/EmptyState';
 import { PreviewPanel } from './components/PreviewPanel';
 import { IndexingBar } from './components/IndexingBar';
+import { FailuresModal } from './components/FailuresModal';
 import { FolderManager } from './components/FolderManager';
 import ApiKeyDialog from './components/ApiKeyDialog';
 import Toast from './components/Toast';
@@ -34,12 +35,15 @@ function App() {
   const indexingStatus = useIndexingStatus();
 
   const [indexingDismissed, setIndexingDismissed] = useState(false);
+  const [showFailuresModal, setShowFailuresModal] = useState(false);
   const prevIsRunningRef = useRef(false);
 
   useEffect(() => {
     if (indexingStatus.isRunning && !prevIsRunningRef.current) {
       // New indexing run started — reset dismissed state so bar reappears
       setIndexingDismissed(false);
+      // Close failures modal so stale content is not shown (REQ-056)
+      setShowFailuresModal(false);
     }
     prevIsRunningRef.current = indexingStatus.isRunning;
   }, [indexingStatus.isRunning]);
@@ -214,8 +218,14 @@ function App() {
         <IndexingBar
           status={indexingStatus}
           onDismiss={() => setIndexingDismissed(true)}
+          onViewFailures={() => setShowFailuresModal(true)}
         />
       )}
+      <FailuresModal
+        open={showFailuresModal}
+        onClose={() => setShowFailuresModal(false)}
+        groups={indexingStatus.failedFileGroups ?? []}
+      />
       {showFolderManager && (
         <FolderManager onClose={() => setShowFolderManager(false)} />
       )}

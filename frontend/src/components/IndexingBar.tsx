@@ -5,6 +5,7 @@ import type { IndexingStatus } from '../hooks/useIndexingStatus';
 interface IndexingBarProps {
   status: IndexingStatus;
   onDismiss: () => void;
+  onViewFailures?: () => void;
 }
 
 function getFileName(path: string): string {
@@ -20,7 +21,8 @@ function formatCountdown(resumeAt: string | null): string {
   return `in ${secs}s`;
 }
 
-export function IndexingBar({ status, onDismiss }: IndexingBarProps) {
+export function IndexingBar({ status, onDismiss, onViewFailures }: IndexingBarProps) {
+  const handleViewFailures = onViewFailures ?? (() => undefined);
   const [expanded, setExpanded] = useState(false);
 
   if (!status.isRunning && status.indexedFiles === 0) {
@@ -64,10 +66,31 @@ export function IndexingBar({ status, onDismiss }: IndexingBarProps) {
               Rate limited — resuming {formatCountdown(status.quotaResumeAt || null)}
             </span>
           ) : (
-            <span style={styles.statusText}>
-              Indexing {processed.toLocaleString()}/{status.totalFiles.toLocaleString()} files
-              {hasErrors && ` (${status.failedFiles.toLocaleString()} failed)`}
-            </span>
+            <>
+              <span style={styles.statusText}>
+                {(() => {
+                  const retrying = status.pendingRetryFiles ?? 0;
+                  const failed = status.failedFiles;
+                  const base = `Indexing ${processed.toLocaleString()}/${status.totalFiles.toLocaleString()} files`;
+                  if (retrying > 0 && failed > 0) {
+                    return `${base} (${retrying.toLocaleString()} retrying, ${failed.toLocaleString()} failed)`;
+                  } else if (retrying > 0) {
+                    return `${base} (${retrying.toLocaleString()} retrying)`;
+                  } else if (failed > 0) {
+                    return `${base} (${failed.toLocaleString()} failed)`;
+                  }
+                  return base;
+                })()}
+              </span>
+              {(status.failedFiles > 0) && (
+                <button
+                  style={styles.viewButton}
+                  onClick={(e) => { e.stopPropagation(); handleViewFailures(); }}
+                >
+                  View
+                </button>
+              )}
+            </>
           )}
         </div>
 
@@ -218,5 +241,17 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '3px 10px',
     cursor: 'pointer',
     fontFamily: 'var(--font-sans)',
+  },
+  viewButton: {
+    background: 'none',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--text-secondary)',
+    fontSize: '11px',
+    padding: '1px 6px',
+    cursor: 'pointer',
+    fontFamily: 'var(--font-sans)',
+    lineHeight: 1.4,
+    flexShrink: 0,
   },
 };

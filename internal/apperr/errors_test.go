@@ -69,3 +69,119 @@ func TestStableErrorCodes_AllDefined(t *testing.T) {
 		}
 	}
 }
+
+// REQ-001: new indexing-failure error codes.
+func TestNewIndexingErrorCodes_AllDefined(t *testing.T) {
+	cases := []struct {
+		err  *Error
+		code string
+	}{
+		{ErrUnsupportedFormat, "ERR_UNSUPPORTED_FORMAT"},
+		{ErrExtractionFailed, "ERR_EXTRACTION_FAILED"},
+		{ErrFileTooLarge, "ERR_FILE_TOO_LARGE"},
+		{ErrFileUnreadable, "ERR_FILE_UNREADABLE"},
+		{ErrEmbedCountMismatch, "ERR_EMBED_COUNT_MISMATCH"},
+		{ErrHnswAdd, "ERR_HNSW_ADD"},
+		{ErrStoreWrite, "ERR_STORE_WRITE"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.code, func(t *testing.T) {
+			if tc.err == nil {
+				t.Fatalf("%s is nil", tc.code)
+			}
+			if tc.err.Code != tc.code {
+				t.Errorf("got code %q, want %q", tc.err.Code, tc.code)
+			}
+			if tc.err.Message == "" {
+				t.Errorf("%s has empty Message", tc.code)
+			}
+		})
+	}
+}
+
+// REQ-002: Classification values for every indexing-related code.
+func TestClassify_KnownCodes(t *testing.T) {
+	cases := []struct {
+		err  error
+		want Classification
+	}{
+		// Permanent
+		{ErrUnsupportedFormat, ClassPermanent},
+		{ErrExtractionFailed, ClassPermanent},
+		{ErrFileTooLarge, ClassPermanent},
+		{ErrFileUnreadable, ClassPermanent},
+		{ErrEmbedCountMismatch, ClassPermanent},
+		// TransientRetry
+		{ErrEmbedFailed, ClassTransientRetry},
+		{ErrHnswAdd, ClassTransientRetry},
+		{ErrStoreWrite, ClassTransientRetry},
+		// TransientWait
+		{ErrRateLimited, ClassTransientWait},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.err.(*Error).Code, func(t *testing.T) {
+			got := Classify(tc.err)
+			if got != tc.want {
+				t.Errorf("Classify(%s) = %q, want %q", tc.err.(*Error).Code, got, tc.want)
+			}
+		})
+	}
+}
+
+// REQ-002: Classify works when err is wrapped via Wrap (errors.As traversal).
+func TestClassify_WrappedErrors(t *testing.T) {
+	inner := errors.New("disk full")
+	wrapped := Wrap("ERR_STORE_WRITE", "store write failed", inner)
+	got := Classify(wrapped)
+	if got != ClassTransientRetry {
+		t.Errorf("Classify(wrapped ERR_STORE_WRITE) = %q, want ClassTransientRetry", got)
+	}
+}
+
+// REQ-004 / EDGE-013: raw (non-apperr) error treated as Permanent.
+func TestClassify_RawErrorIsPermanent(t *testing.T) {
+	raw := errors.New("some unexpected error")
+	got := Classify(raw)
+	if got != ClassPermanent {
+		t.Errorf("Classify(raw error) = %q, want ClassPermanent", got)
+	}
+}
+
+// REQ-002: nil is Permanent.
+func TestClassify_NilIsPermanent(t *testing.T) {
+	got := Classify(nil)
+	if got != ClassPermanent {
+		t.Errorf("Classify(nil) = %q, want ClassPermanent", got)
+	}
+}
+
+// EDGE-013: unknown apperr code defaults to Permanent.
+func TestClassify_UnknownCodeIsPermanent(t *testing.T) {
+	unknown := Wrap("ERR_NOT_REGISTERED", "some future error", nil)
+	got := Classify(unknown)
+	if got != ClassPermanent {
+		t.Errorf("Classify(unknown code) = %q, want ClassPermanent", got)
+	}
+}
+
+// Regression: errors.Is / errors.As still work for new error vars.
+func TestErrorsIs_As_Preserved(t *testing.T) {
+	cause := errors.New("root cause")
+	wrapped := Wrap("ERR_HNSW_ADD", "hnsw add failed", cause)
+
+	// errors.Is should find the cause.
+	if !errors.Is(wrapped, cause) {
+		t.Error("errors.Is did not find wrapped cause through apperr.Error")
+	}
+
+	// errors.As should extract *Error.
+	var appErr *Error
+	if !errors.As(wrapped, &appErr) {
+		t.Fatal("errors.As did not extract *apperr.Error")
+	}
+	if appErr.Code != "ERR_HNSW_ADD" {
+		t.Errorf("extracted code = %q, want ERR_HNSW_ADD", appErr.Code)
+	}
+}

@@ -217,6 +217,12 @@ func runGoldenCase(t *testing.T, c goldenCase, parser *LLMParser) (FilterSpec, P
 	t.Helper()
 	ctx := context.Background()
 
+	// Override Parse's reference time to the case's `now` so relative dates
+	// resolve deterministically regardless of the host's clock or timezone.
+	prev := nowFunc
+	nowFunc = func() time.Time { return c.Now }
+	defer func() { nowFunc = prev }()
+
 	switch c.Mode {
 	case "grammar_only":
 		return Parse(c.Query), OutcomeOK
@@ -242,6 +248,12 @@ func runGoldenCase(t *testing.T, c goldenCase, parser *LLMParser) (FilterSpec, P
 		if decodeErr != nil {
 			return grammarSpec, OutcomeFailed
 		}
+		// NOTE: production (internal/app/search.go) merges grammar + LLM via
+		// query.Merge. The eval currently uses LLM-only because fixture `expected`
+		// outputs were authored against LLM-only semantics; mirroring Merge drops
+		// the overall score by ~0.05 due to clause-count / semantic divergence
+		// rather than any parser bug. Fixture refactor required before enabling
+		// merge here (separate task).
 		return spec, OutcomeOK
 
 	case "merged":

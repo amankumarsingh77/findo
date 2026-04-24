@@ -18,6 +18,10 @@ var recognizedOps = map[string]bool{
 	"path":   true,
 }
 
+// nowFunc returns the reference time used by the grammar's NL date resolution.
+// Overridable from tests via setNowForTest. Production always uses time.Now().
+var nowFunc = func() time.Time { return time.Now() }
+
 // Parse converts a user query string into a FilterSpec.
 // It never panics and returns a best-effort result on malformed input.
 func Parse(input string) (spec FilterSpec) {
@@ -28,7 +32,7 @@ func Parse(input string) (spec FilterSpec) {
 		spec.Source = SourceGrammar
 	}()
 
-	now := time.Now()
+	now := nowFunc()
 	var semanticParts []string
 
 	// First, try to parse natural language patterns
@@ -144,8 +148,101 @@ func Parse(input string) (spec FilterSpec) {
 		semanticParts = append(semanticParts, tok)
 	}
 
-	spec.SemanticQuery = strings.TrimSpace(strings.Join(semanticParts, " "))
+	semanticText := strings.TrimSpace(strings.Join(semanticParts, " "))
+
+	// Post-pass: scan semantic text for an embedded date phrase. If one is
+	// found AND the spec doesn't already have a modified_at clause (from an
+	// explicit operator like before:/after:), emit it and strip the matched
+	// phrase from the semantic text.
+	if semanticText != "" && !specHasModifiedAt(spec) {
+		if after, before, matched, ok := scanForEmbeddedDate(semanticText, now); ok {
+			spec.Must = append(spec.Must,
+				Clause{Field: FieldModifiedAt, Op: OpGte, Value: after.Unix()},
+				Clause{Field: FieldModifiedAt, Op: OpLte, Value: before.Unix()},
+			)
+			semanticText = removeMatchedPhrase(semanticText, matched)
+		}
+	}
+
+	spec.SemanticQuery = semanticText
 	return spec
+}
+
+// specHasModifiedAt returns true iff spec.Must already contains a modified_at
+// clause (from an explicit before:/after: operator or from parseNaturalLanguage).
+func specHasModifiedAt(spec FilterSpec) bool {
+	for _, c := range spec.Must {
+		if c.Field == FieldModifiedAt {
+			return true
+		}
+	}
+	return false
+}
+
+// removeMatchedPhrase strips the first occurrence of the matched date phrase
+// from the semantic text and also strips nearby filler connectives (from, on,
+// at, in, of, during, dated, created, modified) that precede it, along with
+// possessive "'s" suffixes.
+func removeMatchedPhrase(text, phrase string) string {
+	lowerText := strings.ToLower(text)
+	idx := strings.Index(lowerText, phrase)
+	if idx < 0 {
+		return strings.TrimSpace(text)
+	}
+	before := text[:idx]
+	after := text[idx+len(phrase):]
+
+	// Strip one or more trailing filler connective words from `before`.
+	trimmedBefore := strings.TrimRight(before, " ")
+	// Try longest multi-word fillers first, then loop single-word ones.
+	multiWord := []string{
+		"created in the", "created in", "created on", "uploaded in", "uploaded on",
+		"modified in the", "modified in", "modified on",
+		"in the past", "in the last", "within the last", "within the past",
+		"within the", "in the", "within",
+	}
+	singleWord := []string{
+		"from", "on", "at", "during", "dated", "in", "of", "for", "about",
+		"around", "just", "created", "modified", "uploaded",
+	}
+	for _, f := range multiWord {
+		if strings.HasSuffix(strings.ToLower(trimmedBefore), " "+f) ||
+			strings.EqualFold(trimmedBefore, f) {
+			trimmedBefore = trimmedBefore[:len(trimmedBefore)-len(f)]
+			trimmedBefore = strings.TrimRight(trimmedBefore, " ")
+			break
+		}
+	}
+	// Strip up to 3 more trailing single-word fillers.
+	for i := 0; i < 3; i++ {
+		stripped := false
+		for _, filler := range singleWord {
+			if strings.HasSuffix(strings.ToLower(trimmedBefore), " "+filler) ||
+				strings.EqualFold(trimmedBefore, filler) {
+				trimmedBefore = trimmedBefore[:len(trimmedBefore)-len(filler)]
+				trimmedBefore = strings.TrimRight(trimmedBefore, " ")
+				stripped = true
+				break
+			}
+		}
+		if !stripped {
+			break
+		}
+	}
+
+	// Strip a leading possessive "'s" from `after`.
+	after = strings.TrimLeft(after, " ")
+	if strings.HasPrefix(after, "'s ") || after == "'s" {
+		after = strings.TrimPrefix(after, "'s")
+		after = strings.TrimLeft(after, " ")
+	}
+
+	combined := strings.TrimSpace(trimmedBefore + " " + after)
+	// Collapse double spaces.
+	for strings.Contains(combined, "  ") {
+		combined = strings.ReplaceAll(combined, "  ", " ")
+	}
+	return combined
 }
 
 // readToken reads runes until whitespace or end-of-input.

@@ -232,15 +232,21 @@ func TestParseWithRetry_ReasoningDiscarded(t *testing.T) {
 // NOTE: With the new typed ParseResult, the silent attempt-0 grammarSpec fallback is removed (REQ-001).
 // Instead, a non-rate-limit, non-timeout transport error produces OutcomeFailed.
 func TestParseWithRetry_TransportErrorFirstCall(t *testing.T) {
+	callCount := 0
 	generate := func(ctx context.Context, model string, contents []*genai.Content, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
+		callCount++
 		return nil, errors.New("connection refused")
 	}
 
 	grammarSpec := FilterSpec{SemanticQuery: "grammar fallback", Source: SourceGrammar}
 	p := buildFakeParser(generate)
+	p.maxRetries = 0
 	result, err := p.parseWithRetry(context.Background(), "some query", grammarSpec)
 	if err != nil {
 		t.Fatalf("expected no error on first-call transport error, got: %v", err)
+	}
+	if callCount != 1 {
+		t.Fatalf("expected exactly 1 call with maxRetries=0, got %d", callCount)
 	}
 	if result.Spec.SemanticQuery != "grammar fallback" {
 		t.Errorf("expected grammarSpec back, got SemanticQuery=%q", result.Spec.SemanticQuery)
@@ -450,6 +456,9 @@ func TestLLMParser_MaxRetriesFromConfig_Zero(t *testing.T) {
 	}
 	if result.Spec.SemanticQuery != "grammar fallback" {
 		t.Errorf("expected grammar fallback, got %q", result.Spec.SemanticQuery)
+	}
+	if result.Outcome != OutcomeFailed {
+		t.Errorf("expected OutcomeFailed, got %v", result.Outcome)
 	}
 	if callCount != 1 {
 		t.Errorf("expected exactly 1 call with MaxRetries=0, got %d", callCount)

@@ -218,10 +218,21 @@ test.describe.configure({ mode: "serial" });
       // Wait for the search input to be ready.
       await expect(page.locator('[data-testid="search-input"]')).toBeVisible({ timeout: 10_000 });
 
-      // Inject mock — override SearchWithFilters to simulate ERR_EMBED_FAILED.
+      // Inject mocks — keep parsing successful so the search path is reached,
+      // then simulate ERR_EMBED_FAILED from SearchWithFilters.
       await page.evaluate(() => {
         const go = (window as any).go;
         if (!go?.main?.App) return;
+        go.main.App.ParseQuery = async (query: string) => ({
+          chips: [],
+          semanticQuery: query,
+          hasFilters: false,
+          cacheHit: false,
+          isOffline: false,
+          errorCode: "",
+          warning: "",
+          retryAfterMs: 0,
+        });
         go.main.App.SearchWithFilters = async () => ({
           results: [],
           errorCode: "ERR_EMBED_FAILED",
@@ -252,10 +263,20 @@ test.describe.configure({ mode: "serial" });
 
       await expect(page.locator('[data-testid="search-input"]')).toBeVisible({ timeout: 10_000 });
 
-      // Inject mock.
+      // Inject mocks — keep parsing successful so the search path is reached.
       await page.evaluate(() => {
         const go = (window as any).go;
         if (!go?.main?.App) return;
+        go.main.App.ParseQuery = async (query: string) => ({
+          chips: [],
+          semanticQuery: query,
+          hasFilters: false,
+          cacheHit: false,
+          isOffline: false,
+          errorCode: "",
+          warning: "",
+          retryAfterMs: 0,
+        });
         go.main.App.SearchWithFilters = async () => ({
           results: [],
           errorCode: "ERR_RATE_LIMITED",
@@ -300,22 +321,28 @@ test.describe.configure({ mode: "serial" });
           warning: "query_parse_timeout",
           chips: [],
           semanticQuery: "hello",
+          hasFilters: false,
+          cacheHit: false,
+          isOffline: false,
           errorCode: "",
           retryAfterMs: 0,
         });
         go.main.App.SearchWithFilters = async () => ({
           results: [
             {
-              fileId: 1,
               filePath: "/tmp/hello.txt",
               fileName: "hello.txt",
               fileType: "text",
-              extension: ".txt",
+              extension: "txt",
+              sizeBytes: 11,
+              thumbnailPath: "",
+              startTime: 0,
+              endTime: 0,
               score: 0.9,
-              snippet: "hello world",
-              modifiedAt: new Date().toISOString(),
+              modifiedAt: Math.floor(Date.now() / 1000),
             },
           ],
+          relaxationBanner: "",
           errorCode: "",
           retryAfterMs: 0,
         });

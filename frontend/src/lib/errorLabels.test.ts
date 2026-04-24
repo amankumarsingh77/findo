@@ -9,6 +9,7 @@ describe('errorLabels', () => {
 
     it('has a description mentioning Gemini and connection', () => {
       expect(CODE_DESCRIPTIONS['ERR_QUERY_PARSE_FAILED']).toContain('Gemini');
+      expect(CODE_DESCRIPTIONS['ERR_QUERY_PARSE_FAILED']).toMatch(/connection|connect/i);
     });
 
     it('labelForCode returns the label', () => {

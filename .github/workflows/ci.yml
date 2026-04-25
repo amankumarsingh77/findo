@@ -33,7 +33,13 @@ jobs:
             build-essential \
             pkg-config \
             libayatana-appindicator3-dev \
-            libx11-dev
+            libx11-dev \
+            xvfb
+
+      - name: Start Xvfb
+        run: |
+          Xvfb :99 -screen 0 1024x768x24 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
 
       - name: Install staticcheck
         run: go install honnef.co/go/tools/cmd/staticcheck@latest

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 	"unicode/utf8"
 
@@ -13,61 +12,32 @@ import (
 )
 
 // Search embeds the query via Gemini and returns the top search results.
+// It classifies the query first so that filename-only queries skip the
+// embedding call entirely.
 func (a *App) Search(queryText string) ([]SearchResultDTO, error) {
-	if a.embedder == nil {
-		return nil, apperr.New(apperr.ErrEmbedFailed.Code, "embedder not initialized — set GEMINI_API_KEY")
-	}
-
 	a.logger.Info("search query", "query", queryText)
 
-	var vec []float32
-	if a.store != nil {
-		cached, err := a.store.GetQueryCache(queryText)
-		if err == nil && cached != nil {
-			a.logger.Info("query cache hit", "query", queryText)
-			vec = cached
-		}
+	// Classify first; only embed for content/hybrid kinds.
+	// The embed step runs before the engine nil-check so that embedding errors
+	// are surfaced as ERR_EMBED_FAILED rather than ERR_INTERNAL.
+	kind, vec, err := a.classifyAndEmbed(queryText)
+	if err != nil {
+		return nil, apperr.Wrap(apperr.ErrEmbedFailed.Code, "embedding failed", err)
 	}
-
-	if vec == nil {
-		var err error
-		vec, err = a.embedder.EmbedQuery(a.ctx, queryText)
-		if err != nil {
-			return nil, apperr.Wrap(apperr.ErrEmbedFailed.Code, "embedding failed", err)
-		}
-		if a.store != nil {
-			go func() {
-				if err := a.store.SetQueryCache(queryText, vec); err != nil {
-					a.logger.Warn("search: failed to cache query vector", "error", err)
-				}
-			}()
-		}
-	}
+	_ = kind // engine re-classifies internally via SearchUnified
 
 	if a.engine == nil {
 		return nil, apperr.New(apperr.ErrInternal.Code, "search engine not initialized")
 	}
-	results, err := a.engine.SearchByVector(vec, 20)
+
+	res, err := a.engine.SearchUnified(a.ctx, queryText, vec, query.FilterSpec{}, 20)
 	if err != nil {
 		return nil, apperr.Wrap(apperr.ErrInternal.Code, "search failed", err)
 	}
 
-	dtos := make([]SearchResultDTO, len(results))
-	for i, r := range results {
-		dtos[i] = SearchResultDTO{
-			FilePath:      r.File.Path,
-			FileName:      filepath.Base(r.File.Path),
-			FileType:      r.File.FileType,
-			Extension:     r.File.Extension,
-			SizeBytes:     r.File.SizeBytes,
-			ThumbnailPath: r.File.ThumbnailPath,
-			StartTime:     r.StartTime,
-			EndTime:       r.EndTime,
-			Score:         1 - r.Distance/2,
-		}
-	}
+	dtos := blendedDTOs(res.Results)
 
-	a.logger.Info("search results", "query", queryText, "results", len(dtos))
+	a.logger.Info("search results", "query", queryText, "results", len(dtos), "kind", res.Kind.String())
 	for i, d := range dtos {
 		a.logger.Debug("search result",
 			"rank", i+1,

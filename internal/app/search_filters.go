@@ -85,7 +85,7 @@ func (a *App) SearchWithFilters(raw string, semanticQuery string, denyList []str
 		mergedSpec.SemanticQuery = semanticQuery
 	}
 
-	// Embed the semantic query.
+	// Classify the query; only embed for content/hybrid kinds to save Gemini calls.
 	queryText := mergedSpec.SemanticQuery
 	if queryText == "" {
 		queryText = raw
@@ -94,32 +94,39 @@ func (a *App) SearchWithFilters(raw string, semanticQuery string, denyList []str
 		return SearchWithFiltersResult{}, nil
 	}
 
-	a.logger.Debug("search_with_filters: embedding query", "query_text", queryText)
-	queryVec, err := a.getQueryVector(emb, queryText)
-	if err != nil {
-		a.logger.Warn("search_with_filters: embedding failed", "error", err)
-		if errors.Is(err, apperr.ErrRateLimited) {
-			var retryAfterMs int64
-			if pausedUntil := emb.PausedUntil(); !pausedUntil.IsZero() {
-				if remaining := time.Until(pausedUntil).Milliseconds(); remaining > 0 {
-					retryAfterMs = remaining
+	classifyKind, _ := query.Classify(queryText)
+	var queryVec []float32
+	if classifyKind != query.KindFilename {
+		a.logger.Debug("search_with_filters: embedding query", "query_text", queryText)
+		var embedErr error
+		queryVec, embedErr = a.getQueryVector(emb, queryText)
+		if embedErr != nil {
+			a.logger.Warn("search_with_filters: embedding failed", "error", embedErr)
+			if errors.Is(embedErr, apperr.ErrRateLimited) {
+				var retryAfterMs int64
+				if pausedUntil := emb.PausedUntil(); !pausedUntil.IsZero() {
+					if remaining := time.Until(pausedUntil).Milliseconds(); remaining > 0 {
+						retryAfterMs = remaining
+					}
 				}
+				return SearchWithFiltersResult{
+					ErrorCode:    apperr.ErrRateLimited.Code,
+					RetryAfterMs: retryAfterMs,
+				}, nil
 			}
-			return SearchWithFiltersResult{
-				ErrorCode:    apperr.ErrRateLimited.Code,
-				RetryAfterMs: retryAfterMs,
-			}, nil
+			return SearchWithFiltersResult{ErrorCode: apperr.ErrEmbedFailed.Code}, nil
 		}
-		return SearchWithFiltersResult{ErrorCode: apperr.ErrEmbedFailed.Code}, nil
 	}
-	a.logger.Debug("search_with_filters: query embedded, running search engine",
+
+	a.logger.Debug("search_with_filters: running search engine",
+		"kind", classifyKind.String(),
 		"must", len(mergedSpec.Must),
 		"must_not", len(mergedSpec.MustNot),
 		"should", len(mergedSpec.Should),
 	)
 
-	// Run SearchWithSpec; surface typed errors to the caller.
-	searchResult, err := a.engine.SearchWithSpec(queryVec, mergedSpec, raw, 20)
+	// Route through SearchUnified; surface typed errors to the caller.
+	searchResult, err := a.engine.SearchUnified(a.ctx, queryText, queryVec, mergedSpec, 20)
 	if err != nil {
 		if errors.Is(err, apperr.ErrModelMismatch) {
 			a.logger.Warn("search: model mismatch, prompting user to reindex")
@@ -128,21 +135,20 @@ func (a *App) SearchWithFilters(raw string, semanticQuery string, denyList []str
 		return SearchWithFiltersResult{}, err
 	}
 	a.logger.Debug("search_with_filters: engine returned",
+		"kind", searchResult.Kind.String(),
 		"strategy", searchResult.Strategy,
 		"planner_count", searchResult.PlannerCount,
 		"results", len(searchResult.Results),
 		"relaxation_banner", searchResult.RelaxationBanner,
 	)
 
-	dtos := make([]SearchResultDTO, 0, len(searchResult.Results))
-	for _, r := range searchResult.Results {
-		dtos = append(dtos, toSearchResultDTO(r))
-	}
+	dtos := blendedDTOs(searchResult.Results)
 
 	a.logger.Debug("query pipeline complete",
 		"raw", raw,
 		"grammar_filter_count", grammarFilterCount,
 		"llm_filter_count", llmFilterCount,
+		"kind", searchResult.Kind.String(),
 		"chosen_strategy", searchResult.Strategy,
 		"planner_count", searchResult.PlannerCount,
 		"final_result_count", len(dtos),
@@ -177,6 +183,10 @@ func (a *App) searchFilenameOnly(queryText string) (SearchWithFiltersResult, err
 			ThumbnailPath: f.ThumbnailPath,
 			Score:         0,
 			ModifiedAt:    f.ModifiedAt.Unix(),
+			// Offline path produces filename-only hits; set MatchKind explicitly
+			// so the frontend MatchKindIcon renders the correct icon variant.
+			// result.matchKind ?? 'content' only coerces null/undefined, not "".
+			MatchKind: "filename",
 		})
 	}
 	return SearchWithFiltersResult{Results: dtos}, nil

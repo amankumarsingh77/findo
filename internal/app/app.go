@@ -257,17 +257,7 @@ func (a *App) startup(ctx context.Context) {
 		log.Warn("no gemini api key configured — embedder not initialised")
 	}
 
-	plannerCfg := search.PlannerConfig{
-		BruteForceThreshold: a.getBruteForceThreshold(),
-		OverFetchMultiplier: a.cfg.Search.OverFetchMultiplier,
-	}
-	planner := search.NewPlannerWithLogger(a.store, a.index, plannerCfg, a.logger.WithGroup("planner"))
-	a.engine = search.NewWithConfig(a.store, a.index, a.logger, planner, search.EngineConfig{
-		Planner:  plannerCfg,
-		Reranker: search.RerankerConfig{RecencyBoostMultiplier: float32(a.cfg.Search.RecencyBoostMultiplier), RecencyWindowDays: a.cfg.Search.RecencyWindowDays},
-		Ladder:   search.LadderConfig{Enabled: a.cfg.Search.RelaxationEnabled, DropOrder: search.ParseDropOrder(a.cfg.Search.RelaxationDropOrder)},
-		Merger:   search.MergerConfig{Enabled: a.cfg.Search.FilenameMergeEnabled},
-	})
+	a.engine = a.buildSearchEngine()
 
 	// Wire NL query understanding components.
 	a.parsedQueryCache = query.NewParsedQueryCache(a.store)

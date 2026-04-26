@@ -14,6 +14,7 @@ export function FoldersTab() {
   const [reindexingFolder, setReindexingFolder] = useState<string | null>(null);
   const [pickingFolder, setPickingFolder] = useState(false);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [patternFocused, setPatternFocused] = useState(false);
   const { withSuppressedHide } = useHideSuppression();
 
   const loadFolders = useCallback(async () => {
@@ -202,12 +203,22 @@ export function FoldersTab() {
           ))}
           <div style={styles.addPatternRow}>
             <input
-              style={styles.patternInput}
+              style={{
+                ...styles.patternInput,
+                borderColor: patternFocused ? 'var(--border-focus)' : 'var(--border)',
+              }}
               type="text"
-              placeholder="+ Add pattern"
+              placeholder="e.g. node_modules"
               value={newPattern}
               onChange={(e) => setNewPattern(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddPattern()}
+              onFocus={() => setPatternFocused(true)}
+              onBlur={() => setPatternFocused(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddPattern();
+                }
+              }}
             />
             {newPattern.trim() && (
               <button style={styles.addPatternBtn} onClick={handleAddPattern}>Add</button>
@@ -311,12 +322,12 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute',
     right: 0,
     top: '100%',
-    background: 'var(--bg-surface)',
+    background: 'var(--bg-surface-opaque-2)',
     border: '1px solid var(--border)',
     borderRadius: 'var(--radius-md, 8px)',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
     zIndex: 100,
-    minWidth: 130,
+    minWidth: 140,
     padding: '4px 0',
   },
   dropItem: {
@@ -410,25 +421,26 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 6,
   },
   patternInput: {
-    background: 'transparent',
-    border: '1px dashed var(--border)',
+    background: 'var(--bg-surface-opaque-2)',
+    border: '1px solid var(--border)',
     borderRadius: 'var(--radius-sm, 4px)',
-    color: 'var(--text-tertiary)',
+    color: 'var(--text-primary)',
     fontSize: 13,
     padding: '5px 10px',
     fontFamily: 'var(--font-mono)',
     outline: 'none',
     cursor: 'text',
-    width: 120,
+    width: 140,
   },
   addPatternBtn: {
-    background: 'var(--bg-surface-2, var(--bg-surface))',
+    background: 'var(--accent, #7c6fe0)',
     border: 'none',
     borderRadius: 'var(--radius-sm, 4px)',
-    color: 'var(--text-secondary)',
+    color: '#fff',
     fontSize: 12,
-    padding: '5px 10px',
+    padding: '5px 12px',
     cursor: 'pointer',
     fontFamily: 'var(--font-sans)',
+    fontWeight: 500,
   },
 };

@@ -109,7 +109,7 @@ export function SettingsPopover({ open, onClose, onOpenSettings }: SettingsPopov
         top: 56,
         right: 12,
         width: 280,
-        background: 'var(--bg-surface)',
+        background: 'var(--bg-surface-opaque-2)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-lg, 12px)',
         boxShadow: '0 8px 32px rgba(0,0,0,0.6)',

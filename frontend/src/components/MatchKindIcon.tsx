@@ -3,7 +3,9 @@ import { FileSearch, Sparkles } from 'lucide-react';
 export type MatchKind = 'filename' | 'content' | 'both';
 
 interface MatchKindIconProps {
-  kind: MatchKind;
+  // Accept a wider string type so callers passing the raw DTO field don't need
+  // to assert. Unknown / empty values fall through to the safe "content" default.
+  kind: MatchKind | string;
   size?: number;
 }
 
@@ -13,11 +15,19 @@ const KIND_LABELS: Record<MatchKind, string> = {
   both: 'Matched by filename and content',
 };
 
-export function MatchKindIcon({ kind, size = 13 }: MatchKindIconProps) {
-  const color = 'var(--text-tertiary)';
-  const label = KIND_LABELS[kind];
+function normalizeKind(kind: MatchKind | string): MatchKind {
+  if (kind === 'filename' || kind === 'content' || kind === 'both') {
+    return kind;
+  }
+  return 'content';
+}
 
-  if (kind === 'filename') {
+export function MatchKindIcon({ kind, size = 13 }: MatchKindIconProps) {
+  const normalized = normalizeKind(kind);
+  const color = 'var(--text-tertiary)';
+  const label = KIND_LABELS[normalized];
+
+  if (normalized === 'filename') {
     return (
       <span style={styles.iconWrap} title={label} aria-label={label}>
         <FileSearch size={size} color={color} strokeWidth={1.8} aria-hidden="true" />
@@ -25,7 +35,7 @@ export function MatchKindIcon({ kind, size = 13 }: MatchKindIconProps) {
     );
   }
 
-  if (kind === 'content') {
+  if (normalized === 'content') {
     return (
       <span style={styles.iconWrap} title={label} aria-label={label}>
         <Sparkles size={size} color={color} strokeWidth={1.8} aria-hidden="true" />

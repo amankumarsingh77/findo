@@ -19,25 +19,40 @@ type SearchWithSpecResult struct {
 	RelaxationBanner string // non-empty if a filter was dropped during relaxation
 }
 
+// SearchUnifiedResult is the return value of Engine.SearchUnified. It carries
+// blended results from both the semantic and filename pipelines, along with
+// routing metadata.
+type SearchUnifiedResult struct {
+	Results          []BlendedResult
+	Kind             query.QueryKind
+	Strategy         string // planner strategy; empty for KindFilename
+	PlannerCount     int
+	RelaxationBanner string
+}
+
 // Engine performs semantic search by combining vector similarity search
 // with SQLite metadata lookups.
 type Engine struct {
-	store    *store.Store
-	index    *vectorstore.Index
-	logger   *slog.Logger
-	planner  *Planner
-	reranker *Reranker
-	ladder   *Ladder
-	merger   *Merger
-	modelID  string // current embedder model; empty disables the gate
+	store       *store.Store
+	index       *vectorstore.Index
+	logger      *slog.Logger
+	planner     *Planner
+	reranker    *Reranker
+	ladder      *Ladder
+	merger      *Merger
+	modelID     string         // current embedder model; empty disables the gate
+	filenameIdx FilenameIndex  // nil when FilenameSearch is disabled
+	blendCfg    BlendConfig
 }
 
 // EngineConfig bundles tunables for the search engine and its collaborators.
 type EngineConfig struct {
-	Planner  PlannerConfig
-	Reranker RerankerConfig
-	Ladder   LadderConfig
-	Merger   MergerConfig
+	Planner     PlannerConfig
+	Reranker    RerankerConfig
+	Ladder      LadderConfig
+	Merger      MergerConfig
+	FilenameIdx FilenameIndex // nil disables the filename pipeline
+	BlendCfg    BlendConfig
 }
 
 // DefaultEngineConfig returns the historical defaults for all search knobs.
@@ -54,13 +69,15 @@ func DefaultEngineConfig() EngineConfig {
 func New(s *store.Store, idx *vectorstore.Index, logger *slog.Logger, cfg EngineConfig) *Engine {
 	planner := NewPlannerWithLogger(s, idx, cfg.Planner, logger.WithGroup("planner"))
 	return &Engine{
-		store:    s,
-		index:    idx,
-		logger:   logger.WithGroup("search"),
-		planner:  planner,
-		reranker: NewReranker(cfg.Reranker),
-		ladder:   NewLadder(cfg.Ladder),
-		merger:   NewMerger(cfg.Merger),
+		store:       s,
+		index:       idx,
+		logger:      logger.WithGroup("search"),
+		planner:     planner,
+		reranker:    NewReranker(cfg.Reranker),
+		ladder:      NewLadder(cfg.Ladder),
+		merger:      NewMerger(cfg.Merger),
+		filenameIdx: cfg.FilenameIdx,
+		blendCfg:    cfg.BlendCfg,
 	}
 }
 
@@ -69,13 +86,15 @@ func New(s *store.Store, idx *vectorstore.Index, logger *slog.Logger, cfg Engine
 // values through all collaborators.
 func NewWithConfig(s *store.Store, idx *vectorstore.Index, logger *slog.Logger, p *Planner, cfg EngineConfig) *Engine {
 	return &Engine{
-		store:    s,
-		index:    idx,
-		logger:   logger.WithGroup("search"),
-		planner:  p,
-		reranker: NewReranker(cfg.Reranker),
-		ladder:   NewLadder(cfg.Ladder),
-		merger:   NewMerger(cfg.Merger),
+		store:       s,
+		index:       idx,
+		logger:      logger.WithGroup("search"),
+		planner:     p,
+		reranker:    NewReranker(cfg.Reranker),
+		ladder:      NewLadder(cfg.Ladder),
+		merger:      NewMerger(cfg.Merger),
+		filenameIdx: cfg.FilenameIdx,
+		blendCfg:    cfg.BlendCfg,
 	}
 }
 
@@ -98,6 +117,7 @@ func NewWithPlanner(s *store.Store, idx *vectorstore.Index, logger *slog.Logger,
 		reranker: NewReranker(DefaultRerankerConfig()),
 		ladder:   NewLadder(DefaultLadderConfig()),
 		merger:   NewMerger(DefaultMergerConfig()),
+		blendCfg: DefaultBlendConfig(),
 	}
 }
 
@@ -247,4 +267,114 @@ func (e *Engine) SearchWithSpec(queryVec []float32, spec query.FilterSpec, rawQu
 		PlannerCount:     plannerCount,
 		RelaxationBanner: droppedDesc,
 	}, nil
+}
+
+// SearchUnified is the primary entry point for all search queries. It classifies
+// the raw query string, routes to the appropriate pipeline(s), blends results,
+// and returns a SearchUnifiedResult.
+//
+// When filenameIdx is nil (FilenameSearch disabled), the engine forces KindContent
+// regardless of the classifier's decision so that existing behaviour is preserved.
+//
+// queryVec may be nil when kind == KindFilename; the engine does not dereference it.
+func (e *Engine) SearchUnified(ctx context.Context, raw string, queryVec []float32, spec query.FilterSpec, k int) (SearchUnifiedResult, error) {
+	start := time.Now()
+
+	kind, stripped := query.Classify(raw)
+
+	// If the filename pipeline is unavailable, force content-only routing.
+	if e.filenameIdx == nil && kind != query.KindContent {
+		kind = query.KindContent
+		stripped = raw
+	}
+
+	var (
+		semantic []store.SearchResult
+		fnHits   []FilenameHit
+		strategy string
+		plannerCount int
+		droppedDesc  string
+		err          error
+	)
+
+	// Semantic pipeline — run for KindContent and KindHybrid.
+	if kind == query.KindContent || kind == query.KindHybrid {
+		semantic, strategy, plannerCount, droppedDesc, err = e.runSemanticPipeline(ctx, queryVec, spec, stripped, k)
+		if err != nil {
+			return SearchUnifiedResult{Kind: kind, Strategy: strategy, PlannerCount: plannerCount}, err
+		}
+	}
+
+	// Filename pipeline — run for KindFilename and KindHybrid.
+	if kind == query.KindFilename || kind == query.KindHybrid {
+		if e.filenameIdx != nil {
+			fnHits, err = e.filenameIdx.Query(ctx, stripped, k)
+			if err != nil {
+				e.logger.Warn("filename index query failed", "error", err)
+				// Non-fatal: degrade to semantic-only.
+				fnHits = nil
+			}
+		}
+	}
+
+	blended := Blend(semantic, fnHits, kind, e.blendCfg, k)
+
+	e.logger.Info("SearchUnified completed",
+		"kind", kind.String(),
+		"strategy", strategy,
+		"plannerCount", plannerCount,
+		"semantic", len(semantic),
+		"filename", len(fnHits),
+		"blended", len(blended),
+		"rawQuery", raw,
+		"duration", time.Since(start),
+	)
+
+	return SearchUnifiedResult{
+		Results:          blended,
+		Kind:             kind,
+		Strategy:         strategy,
+		PlannerCount:     plannerCount,
+		RelaxationBanner: droppedDesc,
+	}, nil
+}
+
+// runSemanticPipeline executes the planner-based semantic search path used by
+// both KindContent and KindHybrid. It returns the results, planner strategy,
+// planner count, relaxation banner, and any error.
+func (e *Engine) runSemanticPipeline(ctx context.Context, queryVec []float32, spec query.FilterSpec, rawQuery string, k int) (results []store.SearchResult, strategy string, plannerCount int, droppedDesc string, err error) {
+	results, strategy, plannerCount, err = e.planner.Plan(queryVec, spec, k)
+	if err != nil {
+		e.logger.Error("planner failed", "error", err, "strategy", strategy)
+		return
+	}
+
+	// Model gate.
+	if e.modelID != "" {
+		preCount := len(results)
+		filtered := results[:0]
+		for _, r := range results {
+			if r.EmbeddingModel == "" || r.EmbeddingModel == e.modelID {
+				filtered = append(filtered, r)
+			}
+		}
+		results = filtered
+		if preCount > 0 && len(results) == 0 {
+			e.logger.Warn("SearchUnified: all candidates filtered by model gate", "engine_model", e.modelID)
+			err = apperr.ErrModelMismatch
+			return
+		}
+	}
+
+	// Zero-result relaxation.
+	if len(results) == 0 && len(spec.Must) > 0 {
+		results, droppedDesc, err = e.ladder.RelaxationLadder(ctx, e.planner, queryVec, spec, k)
+		if err != nil {
+			return
+		}
+	}
+
+	// Rerank.
+	results = e.reranker.Rerank(results, spec)
+	return
 }

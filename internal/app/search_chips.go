@@ -2,29 +2,11 @@ package app
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"findo/internal/query"
-	"findo/internal/store"
 )
-
-// toSearchResultDTO converts a store.SearchResult to a SearchResultDTO.
-func toSearchResultDTO(r store.SearchResult) SearchResultDTO {
-	return SearchResultDTO{
-		FilePath:      r.File.Path,
-		FileName:      filepath.Base(r.File.Path),
-		FileType:      r.File.FileType,
-		Extension:     r.File.Extension,
-		SizeBytes:     r.File.SizeBytes,
-		ThumbnailPath: r.File.ThumbnailPath,
-		StartTime:     r.StartTime,
-		EndTime:       r.EndTime,
-		Score:         1 - r.Distance/2,
-		ModifiedAt:    r.File.ModifiedAt.Unix(),
-	}
-}
 
 // parseDenyList converts a slice of "field|op|value" strings into ClauseKey values.
 func parseDenyList(denyList []string) []query.ClauseKey {

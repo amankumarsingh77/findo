@@ -1,17 +1,26 @@
 package app
 
+// HighlightRangeDTO is a byte range [Start, End) within a filename string
+// that should be highlighted in the UI.
+type HighlightRangeDTO struct {
+	Start int `json:"start"`
+	End   int `json:"end"`
+}
+
 // SearchResultDTO is the JSON-serializable search result sent to the frontend.
 type SearchResultDTO struct {
-	FilePath      string  `json:"filePath"`
-	FileName      string  `json:"fileName"`
-	FileType      string  `json:"fileType"`
-	Extension     string  `json:"extension"`
-	SizeBytes     int64   `json:"sizeBytes"`
-	ThumbnailPath string  `json:"thumbnailPath"`
-	StartTime     float64 `json:"startTime"`
-	EndTime       float64 `json:"endTime"`
-	Score         float32 `json:"score"`
-	ModifiedAt    int64   `json:"modifiedAt"` // Unix timestamp seconds
+	FilePath      string              `json:"filePath"`
+	FileName      string              `json:"fileName"`
+	FileType      string              `json:"fileType"`
+	Extension     string              `json:"extension"`
+	SizeBytes     int64               `json:"sizeBytes"`
+	ThumbnailPath string              `json:"thumbnailPath"`
+	StartTime     float64             `json:"startTime"`
+	EndTime       float64             `json:"endTime"`
+	Score         float32             `json:"score"`
+	ModifiedAt    int64               `json:"modifiedAt"`                // Unix timestamp seconds
+	MatchKind     string              `json:"matchKind"`                 // "filename" | "content" | "both"
+	Highlights    []HighlightRangeDTO `json:"highlights,omitempty"`      // byte offsets in FileName
 }
 
 // ChipDTO represents a single parsed query filter chip for the frontend.

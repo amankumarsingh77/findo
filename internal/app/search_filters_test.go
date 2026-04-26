@@ -156,6 +156,40 @@ func TestSearchWithFilters_EmbedRateLimited_ZeroPausedUntil_RetryAfterMsIsZero(t
 	}
 }
 
+// TestSearchWithFilters_OfflineFilenameOnly_MatchKind verifies that DTOs
+// produced by the offline filename-only fallback path carry MatchKind ==
+// "filename". The frontend's nullish-coalescing guard (result.matchKind ?? 'content')
+// does not coerce an empty string, so an unset MatchKind causes MatchKindIcon to
+// render the wrong icon variant.
+func TestSearchWithFilters_OfflineFilenameOnly_MatchKind(t *testing.T) {
+	a := newSearchFiltersTestApp(t)
+	// embedder is nil → offline mode, routes through searchFilenameOnly.
+
+	_, err := a.store.UpsertFile(store.FileRecord{
+		Path:       "/home/user/budget.txt",
+		FileType:   "document",
+		Extension:  ".txt",
+		SizeBytes:  256,
+		ModifiedAt: time.Now(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := a.SearchWithFilters("budget", "", nil)
+	if err != nil {
+		t.Fatalf("SearchWithFilters returned unexpected error: %v", err)
+	}
+	if len(result.Results) == 0 {
+		t.Fatal("expected at least one result from offline filename search")
+	}
+	for _, dto := range result.Results {
+		if dto.MatchKind != "filename" {
+			t.Errorf("offline path: MatchKind = %q, want %q", dto.MatchKind, "filename")
+		}
+	}
+}
+
 // TestSearchWithFilters_OfflineUnchanged — REQ-012
 // When embedder is nil (offline), SearchWithFilters must return empty ErrorCode
 // and use filename search (existing behaviour unchanged).

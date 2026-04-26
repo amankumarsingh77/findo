@@ -156,22 +156,6 @@ func isGlobPattern(q string) bool {
 	return strings.ContainsAny(q, "*?")
 }
 
-// globToLike translates a glob pattern to a SQL LIKE pattern.
-//
-// Conversion rules:
-//  1. Escape the backslash escape character itself.
-//  2. Escape literal '%' and '_' so they are not treated as SQL wildcards.
-//  3. Replace glob '*' with SQL '%'.
-//  4. Replace glob '?' with SQL '_'.
-func globToLike(pattern string) string {
-	pattern = strings.ReplaceAll(pattern, `\`, `\\`)
-	pattern = strings.ReplaceAll(pattern, `%`, `\%`)
-	pattern = strings.ReplaceAll(pattern, `_`, `\_`)
-	pattern = strings.ReplaceAll(pattern, `*`, `%`)
-	pattern = strings.ReplaceAll(pattern, `?`, `_`)
-	return pattern
-}
-
 // storeHighlightsToSearch converts []store.HighlightRange to []HighlightRange.
 func storeHighlightsToSearch(in []store.HighlightRange) []HighlightRange {
 	if len(in) == 0 {

@@ -63,8 +63,3 @@ func globToLike(pattern string) string {
 	pattern = strings.ReplaceAll(pattern, `?`, `_`)
 	return pattern
 }
-
-// isGlob reports whether pattern contains any glob wildcard characters.
-func isGlob(pattern string) bool {
-	return strings.ContainsAny(pattern, "*?")
-}

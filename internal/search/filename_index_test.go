@@ -189,29 +189,6 @@ func TestStoreFilenameIndex_GlobQuery_DoesNotRunFuzzy(t *testing.T) {
 	}
 }
 
-func TestStoreFilenameIndex_GlobTranslation(t *testing.T) {
-	tests := []struct {
-		name        string
-		glob        string
-		wantPattern string
-	}{
-		{"star to percent", "*.py", "%.py"},
-		{"question to underscore", "file?.go", "file_.go"},
-		{"literal percent escaped", "%exact%.txt", `\%exact\%.txt`},
-		{"literal underscore escaped", "_file_.go", `\_file\_.go`},
-		{"combined", "src/*.go", "src/%.go"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := globToLike(tt.glob)
-			if got != tt.wantPattern {
-				t.Errorf("globToLike(%q) = %q, want %q", tt.glob, got, tt.wantPattern)
-			}
-		})
-	}
-}
-
 func TestStoreFilenameIndex_SpecialCharsInNonGlobQuery_NoError(t *testing.T) {
 	fake := &fakeIndexStore{
 		searchResults: nil,

@@ -132,9 +132,9 @@ func TestFilenameGlob_RespectsLimit(t *testing.T) {
 
 func TestGlobToLike(t *testing.T) {
 	tests := []struct {
-		name    string
-		glob    string
-		want    string
+		name string
+		glob string
+		want string
 	}{
 		{"star wildcard", "*.py", "%.py"},
 		{"question wildcard", "file?.go", "file_.go"},
@@ -152,25 +152,5 @@ func TestGlobToLike(t *testing.T) {
 				t.Errorf("globToLike(%q) = %q, want %q", tt.glob, got, tt.want)
 			}
 		})
-	}
-}
-
-func TestIsGlob(t *testing.T) {
-	tests := []struct {
-		pattern string
-		want    bool
-	}{
-		{"*.py", true},
-		{"file?.go", true},
-		{"demo.go", false},
-		{"", false},
-		{"path/to/file", false},
-	}
-
-	for _, tt := range tests {
-		got := isGlob(tt.pattern)
-		if got != tt.want {
-			t.Errorf("isGlob(%q) = %v, want %v", tt.pattern, got, tt.want)
-		}
 	}
 }

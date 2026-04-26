@@ -12,5 +12,6 @@ data/
 .DS_Store
 .pi/
 .claude/
+.opencode/
 e2e/test-results/
 test_enhanced.go

@@ -52,10 +52,10 @@ func Score(pattern, candidate string) (score float64, matched []int) {
 	// Collect candidate rune info: rune value, lowercase rune, byte offset,
 	// and whether it sits at a word boundary.
 	type runeInfo struct {
-		r        rune
-		lower    rune
-		byteOff  int
-		wordBnd  bool
+		r         rune
+		lower     rune
+		byteOff   int
+		wordBnd   bool
 		prevLower bool // previous rune was lowercase (for camelCase detection)
 	}
 
@@ -76,7 +76,6 @@ func Score(pattern, candidate string) (score float64, matched []int) {
 		prevR = r
 	}
 
-	// Greedy left-to-right subsequence match.
 	patIdx := 0
 	matched = make([]int, 0, len(lowerPat))
 	ci := 0
@@ -89,7 +88,6 @@ func Score(pattern, candidate string) (score float64, matched []int) {
 	}
 
 	if patIdx < len(lowerPat) {
-		// Pattern could not be fully matched.
 		return 0, nil
 	}
 
@@ -116,17 +114,14 @@ func Score(pattern, candidate string) (score float64, matched []int) {
 		candIdx := offToIdx[byteOffset]
 		ri := infos[candIdx]
 
-		// Consecutive bonus.
 		if candIdx == prevCandIdx+1 {
 			raw += consecutiveBonus
 		}
 
-		// Word boundary bonus.
 		if ri.wordBnd {
 			raw += wordBoundBonus
 		}
 
-		// Case bonus: original candidate rune == original pattern rune.
 		if ri.r == patRunes[pi] {
 			raw += caseBonus
 		}
@@ -215,7 +210,6 @@ func isWordBoundary(prev, cur rune) bool {
 	case '/', '_', '-', '.', ' ':
 		return true
 	}
-	// camelCase: previous was lowercase, current is uppercase.
 	if unicode.IsLower(prev) && unicode.IsUpper(cur) {
 		return true
 	}

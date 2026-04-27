@@ -43,7 +43,6 @@ export function MatchKindIcon({ kind, size = 13 }: MatchKindIconProps) {
     );
   }
 
-  // 'both' — render both icons side by side at slight overlap
   return (
     <span style={styles.bothWrap} title={label} aria-label={label}>
       <span style={styles.bothFirst}>

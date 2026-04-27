@@ -289,7 +289,6 @@ func TestFilenameSearchDefaults(t *testing.T) {
 func TestFilenameSearchMissingSection_FallsBackToDefaults(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
-	// Write a config with no [filename_search] section.
 	body := "[indexing]\nworkers = 2\n"
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)

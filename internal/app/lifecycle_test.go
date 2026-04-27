@@ -12,7 +12,6 @@ import (
 	"findo/internal/config"
 )
 
-// TestApp_SetBaseContext_StoresContext verifies SetBaseContext stores ctx for startup use.
 func TestApp_SetBaseContext_StoresContext(t *testing.T) {
 	a := NewApp(nil)
 	type key struct{}
@@ -26,14 +25,11 @@ func TestApp_SetBaseContext_StoresContext(t *testing.T) {
 	}
 }
 
-// TestApp_EmitBackendError_NoContextNoOp verifies no panic when ctx is nil.
 func TestApp_EmitBackendError_NoContextNoOp(t *testing.T) {
 	a := &App{logger: slog.Default()}
-	// Must not panic despite nil ctx.
 	a.emitBackendError("ERR_TEST", "test", nil)
 }
 
-// TestApp_EmitBackendError_InvokesSink verifies the backend-error test hook is called.
 func TestApp_EmitBackendError_InvokesSink(t *testing.T) {
 	a := &App{logger: slog.Default(), ctx: context.Background()}
 	var mu sync.Mutex
@@ -62,8 +58,6 @@ func TestApp_EmitBackendError_InvokesSink(t *testing.T) {
 	}
 }
 
-// TestApp_BackgroundError_EmitsBackendErrorEvent: when a background task returns
-// a non-retriable error, emitBackendError is invoked.
 func TestApp_BackgroundError_EmitsBackendErrorEvent(t *testing.T) {
 	a := &App{
 		cfg:    config.DefaultConfig(),
@@ -86,8 +80,6 @@ func TestApp_BackgroundError_EmitsBackendErrorEvent(t *testing.T) {
 	}
 }
 
-// TestShutdown_CleanExitOnCancel: shutdownWithTimeout returns cleanly when all
-// background goroutines finish before the timeout elapses.
 func TestShutdown_CleanExitOnCancel(t *testing.T) {
 	a := &App{
 		cfg:    config.DefaultConfig(),
@@ -98,7 +90,6 @@ func TestShutdown_CleanExitOnCancel(t *testing.T) {
 	a.SetBaseContext(context.Background())
 	a.startErrgroup()
 
-	// Launch a cooperative goroutine that finishes when ctx cancels.
 	a.group.Go(func() error {
 		<-a.groupCtx.Done()
 		return nil
@@ -110,7 +101,6 @@ func TestShutdown_CleanExitOnCancel(t *testing.T) {
 	}
 }
 
-// TestEmitStatusLoop_ExitsOnCtxCancel: cancellable status loop cooperates with shutdown.
 func TestEmitStatusLoop_ExitsOnCtxCancel(t *testing.T) {
 	a := &App{cfg: config.DefaultConfig(), logger: slog.Default(), ctx: context.Background()}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -127,7 +117,6 @@ func TestEmitStatusLoop_ExitsOnCtxCancel(t *testing.T) {
 	}
 }
 
-// TestShutdown_TimeoutReturnsTrue: a stuck goroutine triggers the timeout branch.
 func TestShutdown_TimeoutReturnsTrue(t *testing.T) {
 	a := &App{
 		cfg:    config.DefaultConfig(),
@@ -138,7 +127,6 @@ func TestShutdown_TimeoutReturnsTrue(t *testing.T) {
 	a.SetBaseContext(context.Background())
 	a.startErrgroup()
 
-	// Unresponsive goroutine: ignores ctx cancellation for longer than the timeout.
 	done := make(chan struct{})
 	a.group.Go(func() error {
 		<-done

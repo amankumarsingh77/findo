@@ -8,13 +8,11 @@ import (
 	"findo/internal/store"
 )
 
-// fakeIndexStore is a test double for filenameIndexStore.
 type fakeIndexStore struct {
-	searchResults []store.FilenameMatch
-	searchErr     error
-	globResults   []store.FileRecord
-	globErr       error
-	// capture the last glob pattern passed
+	searchResults   []store.FilenameMatch
+	searchErr       error
+	globResults     []store.FileRecord
+	globErr         error
 	lastGlobPattern string
 }
 
@@ -41,7 +39,6 @@ func (f *fakeIndexStore) FilenameGlob(pattern string, limit int) ([]store.FileRe
 	return results, nil
 }
 
-// makeFileRecord is a helper to build a minimal FileRecord for testing.
 func makeFileRecord(path string) store.FileRecord {
 	basename, parent, stem := store.PathParts(path)
 	return store.FileRecord{
@@ -58,7 +55,6 @@ func makeFileRecord(path string) store.FileRecord {
 	}
 }
 
-// makeFilenameMatch builds a store.FilenameMatch with sensible defaults.
 func makeFilenameMatch(path string, score float64, kind string) store.FilenameMatch {
 	f := makeFileRecord(path)
 	return store.FilenameMatch{
@@ -104,7 +100,6 @@ func TestStoreFilenameIndex_StandardQuery_ReturnsHits(t *testing.T) {
 	if len(hits) == 0 {
 		t.Fatal("expected at least one hit")
 	}
-	// Verify no hit exceeds the returned count from the fake.
 	if len(hits) > 3 {
 		t.Errorf("got %d hits, want <= 3", len(hits))
 	}
@@ -149,20 +144,16 @@ func TestStoreFilenameIndex_GlobQuery_UsesGlobPath(t *testing.T) {
 	if len(hits) != 2 {
 		t.Errorf("got %d hits, want 2", len(hits))
 	}
-	// Verify the glob path was used (not FTS).
 	if fake.lastGlobPattern == "" {
 		t.Error("expected FilenameGlob to be called")
 	}
 	if len(fake.searchResults) != 0 {
-		// FTS results were not set, so this indirectly confirms the glob path.
 	}
 }
 
 func TestStoreFilenameIndex_GlobQuery_DoesNotRunFuzzy(t *testing.T) {
-	// Glob queries should use FilenameGlob exclusively; FilenameSearch not called.
 	fake := &fakeIndexStore{
 		searchResults: []store.FilenameMatch{
-			// These should NOT appear in results when glob path is taken.
 			makeFilenameMatch("/home/user/demo.py", 0.9, "exact"),
 		},
 		globResults: []store.FileRecord{
@@ -176,11 +167,9 @@ func TestStoreFilenameIndex_GlobQuery_DoesNotRunFuzzy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Query: %v", err)
 	}
-	// Only the glob result should be present (1 result from globResults).
 	if len(hits) != 1 {
 		t.Errorf("got %d hits, want 1 (glob only)", len(hits))
 	}
-	// Glob hits should have MatchKind "substring" and fixed score 0.8.
 	if hits[0].MatchKind != "substring" {
 		t.Errorf("glob hit MatchKind = %q, want \"substring\"", hits[0].MatchKind)
 	}
@@ -197,7 +186,6 @@ func TestStoreFilenameIndex_SpecialCharsInNonGlobQuery_NoError(t *testing.T) {
 	idx := NewStoreFilenameIndex(fake, 20)
 	ctx := context.Background()
 
-	// Special characters that are not glob wildcards should not cause errors.
 	specialQueries := []string{
 		"file[0]",
 		"query with spaces",
@@ -213,14 +201,10 @@ func TestStoreFilenameIndex_SpecialCharsInNonGlobQuery_NoError(t *testing.T) {
 }
 
 func TestStoreFilenameIndex_OrderingRespectsMaxScore(t *testing.T) {
-	// Provide three matches; fuzzy should score the closest match highest.
 	fake := &fakeIndexStore{
 		searchResults: []store.FilenameMatch{
-			// "demo.py" is an exact match; should score high.
 			makeFilenameMatch("/home/user/demo.py", 1.0, "exact"),
-			// "demo_helper.py" is a more distant match.
 			makeFilenameMatch("/home/user/demo_helper.py", 0.5, "substring"),
-			// "unrelated.py" should score low or zero.
 			makeFilenameMatch("/home/user/unrelated.py", 0.2, "substring"),
 		},
 	}
@@ -234,7 +218,6 @@ func TestStoreFilenameIndex_OrderingRespectsMaxScore(t *testing.T) {
 	if len(hits) < 2 {
 		t.Fatalf("expected at least 2 hits, got %d", len(hits))
 	}
-	// First hit should have a score >= second hit.
 	if hits[0].Score < hits[1].Score {
 		t.Errorf("hits not sorted: hits[0].Score=%v < hits[1].Score=%v", hits[0].Score, hits[1].Score)
 	}

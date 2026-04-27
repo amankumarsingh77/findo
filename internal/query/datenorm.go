@@ -42,11 +42,6 @@ func NormalizeDate(s string, now time.Time) (after, before time.Time, ok bool) {
 	return
 }
 
-// ---------------------------------------------------------------------------
-// ParseSize — unchanged from original; lives here because the file is still
-// small enough (enforced by scripts/check-file-size.sh) and renaming adds churn.
-// ---------------------------------------------------------------------------
-
 // unitMultipliers maps size unit strings to byte multipliers.
 var unitMultipliers = map[string]int64{
 	"b":  1,

@@ -113,8 +113,6 @@ func TestChunk_EmptyFile(t *testing.T) {
 func TestGenerateThumbnail_LogsOnError(t *testing.T) {
 	p, _, _ := newTestPipeline(t, nil)
 
-	// Write a file named .jpg with invalid bytes — thumbnail gen should fail
-	// internally but not panic or return anything.
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bad.jpg")
 	if err := os.WriteFile(path, []byte("not a real jpeg"), 0o644); err != nil {
@@ -127,7 +125,6 @@ func TestGenerateThumbnail_LogsOnError(t *testing.T) {
 			t.Fatalf("generateThumbnail panicked: %v", r)
 		}
 	}()
-	// Return value is the thumb path; may be "" on failure — we don't care.
 	_ = p.generateThumbnail(path, info, chunker.TypeImage)
 }
 

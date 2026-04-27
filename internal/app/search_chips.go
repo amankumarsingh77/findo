@@ -8,7 +8,6 @@ import (
 	"findo/internal/query"
 )
 
-// parseDenyList converts a slice of "field|op|value" strings into ClauseKey values.
 func parseDenyList(denyList []string) []query.ClauseKey {
 	if len(denyList) == 0 {
 		return nil
@@ -28,7 +27,6 @@ func parseDenyList(denyList []string) []query.ClauseKey {
 	return keys
 }
 
-// buildChipDTOs converts a FilterSpec into a slice of ChipDTO values for the frontend.
 func buildChipDTOs(spec query.FilterSpec) []ChipDTO {
 	var chips []ChipDTO
 	for _, c := range spec.Must {
@@ -49,7 +47,6 @@ func buildChipDTOs(spec query.FilterSpec) []ChipDTO {
 	return chips
 }
 
-// clauseToChip converts a single Clause to a ChipDTO with a human-readable label.
 func clauseToChip(c query.Clause, negate bool, clauseType string) (ChipDTO, bool) {
 	var label, valueStr string
 
@@ -145,7 +142,6 @@ func clauseToChip(c query.Clause, negate bool, clauseType string) (ChipDTO, bool
 	}, true
 }
 
-// fileTypeLabel returns a human-readable label for a file_type value.
 func fileTypeLabel(ft string) string {
 	switch ft {
 	case "image":
@@ -166,7 +162,6 @@ func fileTypeLabel(ft string) string {
 	}
 }
 
-// opSymbol returns a human-readable operator symbol.
 func opSymbol(op query.Op) string {
 	switch op {
 	case query.OpGt:
@@ -186,7 +181,6 @@ func opSymbol(op query.Op) string {
 	}
 }
 
-// formatBytes formats a byte count as a human-readable size string.
 func formatBytes(b int64) string {
 	const (
 		KB = 1024

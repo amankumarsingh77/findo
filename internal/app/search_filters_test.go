@@ -13,7 +13,6 @@ import (
 	"findo/internal/store"
 )
 
-// errorEmbedder wraps the fake embedder but returns a configurable error from EmbedQuery.
 type errorEmbedder struct {
 	queryErr    error
 	pausedUntil time.Time
@@ -30,7 +29,6 @@ func (e *errorEmbedder) EmbedBatch(_ context.Context, _ []embedder.ChunkInput) (
 	return nil, nil
 }
 
-// newSearchFiltersTestApp builds a minimal App for SearchWithFilters tests.
 func newSearchFiltersTestApp(t *testing.T) *App {
 	t.Helper()
 	s, err := store.NewStore(":memory:", slog.Default())
@@ -46,15 +44,9 @@ func newSearchFiltersTestApp(t *testing.T) *App {
 	}
 }
 
-// TestSearchWithFilters_EmbedRateLimited_PopulatesErrorCode — REQ-009, EDGE-005
-// When EmbedQuery returns an ErrRateLimited error, SearchWithFilters must return
-// ErrorCode == ERR_RATE_LIMITED, empty Results, and must NOT fall back to
-// filename search (asserted by inserting a file that would match by name).
 func TestSearchWithFilters_EmbedRateLimited_PopulatesErrorCode(t *testing.T) {
 	a := newSearchFiltersTestApp(t)
 
-	// Insert a file that would match "budget" by filename — if searchFilenameOnly
-	// were called, it would appear in Results.
 	_, err := a.store.UpsertFile(store.FileRecord{
 		Path:       "/home/user/budget.pdf",
 		FileType:   "document",
@@ -81,14 +73,9 @@ func TestSearchWithFilters_EmbedRateLimited_PopulatesErrorCode(t *testing.T) {
 	}
 }
 
-// TestSearchWithFilters_EmbedGenericError_PopulatesErrorCode — REQ-010, EDGE-006
-// When EmbedQuery returns a generic (non-rate-limit) error, SearchWithFilters
-// must return ErrorCode == ERR_EMBED_FAILED and empty Results (no filename fallback).
 func TestSearchWithFilters_EmbedGenericError_PopulatesErrorCode(t *testing.T) {
 	a := newSearchFiltersTestApp(t)
 
-	// Insert a file that would match "crash" by filename — if searchFilenameOnly
-	// were called, it would appear in Results.
 	_, err := a.store.UpsertFile(store.FileRecord{
 		Path:       "/home/user/crash_report.txt",
 		FileType:   "document",
@@ -114,9 +101,6 @@ func TestSearchWithFilters_EmbedGenericError_PopulatesErrorCode(t *testing.T) {
 	}
 }
 
-// TestSearchWithFilters_EmbedRateLimited_PopulatesRetryAfterMs — REQ-021, EDGE-005
-// When EmbedQuery returns ErrRateLimited and the embedder has a non-zero PausedUntil,
-// SearchWithFilters must populate RetryAfterMs with the remaining milliseconds.
 func TestSearchWithFilters_EmbedRateLimited_PopulatesRetryAfterMs(t *testing.T) {
 	a := newSearchFiltersTestApp(t)
 
@@ -131,14 +115,11 @@ func TestSearchWithFilters_EmbedRateLimited_PopulatesRetryAfterMs(t *testing.T) 
 	if result.ErrorCode != apperr.ErrRateLimited.Code {
 		t.Errorf("expected ErrorCode=%q, got %q", apperr.ErrRateLimited.Code, result.ErrorCode)
 	}
-	// RetryAfterMs should be between 4000 and 5000 (allowing for small time drift).
 	if result.RetryAfterMs < 4000 || result.RetryAfterMs > 5000 {
 		t.Errorf("expected RetryAfterMs in [4000,5000], got %d", result.RetryAfterMs)
 	}
 }
 
-// TestSearchWithFilters_EmbedRateLimited_ZeroPausedUntil_RetryAfterMsIsZero — EDGE-006
-// When EmbedQuery returns ErrRateLimited but PausedUntil is zero, RetryAfterMs must be 0.
 func TestSearchWithFilters_EmbedRateLimited_ZeroPausedUntil_RetryAfterMsIsZero(t *testing.T) {
 	a := newSearchFiltersTestApp(t)
 
@@ -157,14 +138,8 @@ func TestSearchWithFilters_EmbedRateLimited_ZeroPausedUntil_RetryAfterMsIsZero(t
 	}
 }
 
-// TestSearchWithFilters_OfflineFilenameOnly_MatchKind verifies that DTOs
-// produced by the offline filename-only fallback path carry MatchKind ==
-// "filename". The frontend's nullish-coalescing guard (result.matchKind ?? 'content')
-// does not coerce an empty string, so an unset MatchKind causes MatchKindIcon to
-// render the wrong icon variant.
 func TestSearchWithFilters_OfflineFilenameOnly_MatchKind(t *testing.T) {
 	a := newSearchFiltersTestApp(t)
-	// embedder is nil → offline mode, routes through searchFilenameOnly.
 
 	_, err := a.store.UpsertFile(store.FileRecord{
 		Path:       "/home/user/budget.txt",
@@ -191,14 +166,9 @@ func TestSearchWithFilters_OfflineFilenameOnly_MatchKind(t *testing.T) {
 	}
 }
 
-// TestSearchWithFilters_OfflineUnchanged — REQ-012
-// When embedder is nil (offline), SearchWithFilters must return empty ErrorCode
-// and use filename search (existing behaviour unchanged).
 func TestSearchWithFilters_OfflineUnchanged(t *testing.T) {
 	a := newSearchFiltersTestApp(t)
-	// embedder is nil → offline mode.
 
-	// Insert a file so filename search can find it.
 	_, err := a.store.UpsertFile(store.FileRecord{
 		Path:       "/home/user/notes.txt",
 		FileType:   "document",
@@ -217,7 +187,6 @@ func TestSearchWithFilters_OfflineUnchanged(t *testing.T) {
 	if result.ErrorCode != "" {
 		t.Errorf("expected empty ErrorCode in offline mode, got %q", result.ErrorCode)
 	}
-	// Filename search should have run and found the file.
 	found := false
 	for _, r := range result.Results {
 		if r.FileName == "notes.txt" {

@@ -45,7 +45,7 @@ func writeTextCorpus(t *testing.T, dir string, n int) []string {
 type countingEmbedder struct {
 	inner    *embedder.FakeEmbedder
 	calls    atomic.Int32
-	failOnce atomic.Int32 // call index to fail at, or 0 to disable
+	failOnce atomic.Int32
 	failErr  error
 }
 
@@ -98,7 +98,6 @@ func TestIntegration_ShutdownMidIndex(t *testing.T) {
 
 	p.SubmitFolder(dir, nil, false)
 
-	// Let indexing make progress, then cancel.
 	time.Sleep(50 * time.Millisecond)
 
 	done := make(chan struct{})
@@ -147,7 +146,7 @@ func TestIntegration_TwoPhaseCommitRollback(t *testing.T) {
 		inner:   embedder.NewFake("int-fake", 64),
 		failErr: errors.New("synthetic embed failure"),
 	}
-	fake.failOnce.Store(2) // fail on the 2nd EmbedBatch call
+	fake.failOnce.Store(2)
 
 	p := NewPipeline(s, idx, fake, t.TempDir(), intLogger, nil, PipelineConfig{Workers: 1, JobQueueSize: 8, SaveEveryN: 50})
 	defer p.Stop()
@@ -194,13 +193,11 @@ func TestIntegration_RateLimitPauseResume(t *testing.T) {
 	p := NewPipeline(s, idx, fake, t.TempDir(), intLogger, nil, PipelineConfig{Workers: 1, JobQueueSize: 8, SaveEveryN: 50})
 	defer p.Stop()
 
-	// First file — succeeds.
 	p.processSingleFile(paths[0])
 	if p.Status().QuotaPaused {
 		t.Fatal("QuotaPaused=true before any quota error; want false")
 	}
 
-	// Second file — embedder returns quota error, pipeline flips QuotaPaused.
 	p.processSingleFile(paths[1])
 	if !p.Status().QuotaPaused {
 		t.Fatal("expected QuotaPaused=true after quota-exhausted embed error")
@@ -209,7 +206,6 @@ func TestIntegration_RateLimitPauseResume(t *testing.T) {
 		t.Error("expected QuotaResumeAt to be set after quota pause")
 	}
 
-	// Third file — embedder recovers, file indexes normally.
 	p.processSingleFile(paths[2])
 	rec, err := s.GetFileByPath(paths[2])
 	if err != nil {
@@ -271,8 +267,6 @@ func TestIntegration_LegacyDatabaseAdoption(t *testing.T) {
 	}
 	seed.Close()
 
-	// Open via the real store — must apply legacy adoption + migration 004
-	// and succeed.
 	s, err := store.NewStore(dbPath, intLogger)
 	if err != nil {
 		t.Fatalf("NewStore on legacy DB: %v", err)

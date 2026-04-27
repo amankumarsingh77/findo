@@ -6,9 +6,6 @@ import (
 	"time"
 )
 
-// TestSystemPrompt_ContainsCriticalInstruction asserts REQ-017 — the prompt
-// includes the explicit "never leave Must empty" instruction that the LLM is
-// expected to follow.
 func TestSystemPrompt_ContainsCriticalInstruction(t *testing.T) {
 	t.Parallel()
 	prompt := buildSystemPrompt(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC))
@@ -25,10 +22,6 @@ func TestSystemPrompt_ContainsCriticalInstruction(t *testing.T) {
 	}
 }
 
-// TestSystemPrompt_ContainsAllRequiredFewShots asserts REQ-016 — the prompt
-// includes one example of each documented failure category. Looking for
-// substring markers rather than exact strings so future prompt edits remain
-// flexible without breaking tests.
 func TestSystemPrompt_ContainsAllRequiredFewShots(t *testing.T) {
 	t.Parallel()
 	prompt := buildSystemPrompt(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC))

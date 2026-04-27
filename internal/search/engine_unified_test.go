@@ -11,7 +11,6 @@ import (
 	"findo/internal/vectorstore"
 )
 
-// stubFilenameIndex is a test double for FilenameIndex that records calls.
 type stubFilenameIndex struct {
 	hits   []FilenameHit
 	called bool
@@ -23,10 +22,6 @@ func (s *stubFilenameIndex) Query(_ context.Context, _ string, _ int) ([]Filenam
 	return s.hits, s.err
 }
 
-// plannerCallTracker wraps a real Planner but records whether Plan was called.
-// We use a real engine but track the filename index stub to verify routing.
-
-// makeUnifiedEngine builds an engine with a stubFilenameIndex for testing.
 func makeUnifiedEngine(t *testing.T, fidx FilenameIndex) (*Engine, *store.Store, *vectorstore.Index) {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -37,7 +32,6 @@ func makeUnifiedEngine(t *testing.T, fidx FilenameIndex) (*Engine, *store.Store,
 	t.Cleanup(func() { db.Close() })
 	idx := vectorstore.NewDefaultIndex(logger)
 
-	// Seed one file + chunk so semantic search can return something.
 	fileID, err := db.UpsertFile(store.FileRecord{
 		Path: "/tmp/engine_unified.txt", FileType: "text", Extension: ".txt", SizeBytes: 100,
 	})
@@ -68,7 +62,6 @@ func TestSearchUnified_KindContent_SkipsFilenameIndex(t *testing.T) {
 	}}
 	eng, _, _ := makeUnifiedEngine(t, stub)
 
-	// "find the document about finance" → KindContent (has stopword)
 	raw := "find the document about finance"
 	queryVec := make([]float32, 768)
 	queryVec[0] = 1.0
@@ -83,7 +76,6 @@ func TestSearchUnified_KindContent_SkipsFilenameIndex(t *testing.T) {
 	if res.Kind != query.KindContent {
 		t.Errorf("expected KindContent, got %v", res.Kind)
 	}
-	// All results should have MatchKind="content"
 	for _, r := range res.Results {
 		if r.MatchKind != "content" {
 			t.Errorf("result MatchKind = %q, want \"content\"", r.MatchKind)
@@ -99,10 +91,8 @@ func TestSearchUnified_KindFilename_SkipsSemanticPipeline(t *testing.T) {
 	}}
 	eng, _, _ := makeUnifiedEngine(t, stub)
 
-	// "demo.py" → KindFilename (has extension)
 	raw := "demo.py"
 
-	// Pass nil queryVec — for KindFilename the engine must not dereference it.
 	res, err := eng.SearchUnified(context.Background(), raw, nil, query.FilterSpec{}, 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -132,7 +122,6 @@ func TestSearchUnified_KindHybrid_CallsBoth(t *testing.T) {
 	}}
 	eng, _, _ := makeUnifiedEngine(t, stub)
 
-	// "engine_unified" → KindHybrid (single identifier-like token, no extension)
 	raw := "engine_unified"
 	queryVec := make([]float32, 768)
 	queryVec[0] = 1.0
@@ -147,7 +136,6 @@ func TestSearchUnified_KindHybrid_CallsBoth(t *testing.T) {
 	if res.Kind != query.KindHybrid {
 		t.Errorf("expected KindHybrid, got %v", res.Kind)
 	}
-	// The file appears in both pipelines → MatchKind should be "both"
 	if len(res.Results) == 0 {
 		t.Fatal("expected blended results")
 	}
@@ -162,7 +150,6 @@ func TestSearchUnified_NilFilenameIdx_ForcesContent(t *testing.T) {
 	eng, _, _ := makeUnifiedEngine(t, nil) // no filenameIdx
 	eng.filenameIdx = nil
 
-	// "demo.py" would normally be KindFilename, but filenameIdx is nil.
 	raw := "demo.py"
 	queryVec := make([]float32, 768)
 	queryVec[0] = 1.0

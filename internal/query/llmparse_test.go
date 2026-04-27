@@ -21,8 +21,6 @@ func mustMarshal(v any) string {
 	return string(b)
 }
 
-// --- validateLLMResponse tests ---
-
 // REQ-010: structured signal + empty Must + empty MustNot → non-nil error; error mentions detected field name
 func TestValidateLLMResponse_StructuredSignalEmptyClauses(t *testing.T) {
 	// ".pdf" triggers Extension signal
@@ -72,8 +70,6 @@ func TestValidateLLMResponse_FreeTextQuery(t *testing.T) {
 		t.Fatalf("expected nil error for free-text query, got: %v", err)
 	}
 }
-
-// --- decodeJSONResponse tests ---
 
 func TestDecodeJSONResponseHappy(t *testing.T) {
 	args := map[string]any{
@@ -200,8 +196,6 @@ func TestDecodeJSONResponse_EmptyTextPart(t *testing.T) {
 		t.Fatal("expected error for empty text part")
 	}
 }
-
-// --- parseWithRetry tests ---
 
 // buildFakeParser constructs an LLMParser with generate injected for testing.
 func buildFakeParser(generate generateContentFn) *LLMParser {
@@ -474,8 +468,6 @@ func roleSlice(cs []*genai.Content) []string {
 	}
 	return out
 }
-
-// --- helpers ---
 
 func containsStr(s, sub string) bool {
 	if len(sub) == 0 {

@@ -60,7 +60,6 @@ func (s *Store) FilenameSearch(query string, limit int) ([]FilenameMatch, error)
 		limit = 50
 	}
 
-	// Phase 1 — exact basename match.
 	exact, err := s.exactBasenameSearch(query, limit)
 	if err != nil {
 		return nil, apperr.Wrap("ERR_FILENAME_SEARCH_FAILED", "filename exact search failed", err)
@@ -78,7 +77,6 @@ func (s *Store) FilenameSearch(query string, limit int) ([]FilenameMatch, error)
 		return results, nil
 	}
 
-	// Phase 2 — FTS5 MATCH.
 	fts, err := s.ftsSearch(query, remaining+len(exact)) // fetch extra to allow dedup
 	if err != nil {
 		return nil, apperr.Wrap("ERR_FILENAME_SEARCH_FAILED", "filename FTS search failed", err)

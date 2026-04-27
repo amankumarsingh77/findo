@@ -63,7 +63,6 @@ export function FailuresModal({ open, onClose, groups }: FailuresModalProps) {
         style={styles.card}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div style={styles.header}>
           <span style={styles.title}>
             {totalFailed.toLocaleString()} {totalFailed === 1 ? 'file' : 'files'} failed to index
@@ -71,7 +70,6 @@ export function FailuresModal({ open, onClose, groups }: FailuresModalProps) {
           <button style={styles.closeBtn} onClick={onClose} title="Close">×</button>
         </div>
 
-        {/* Body */}
         <div style={styles.body}>
           {loading && (
             <div style={styles.infoRow}>Loading…</div>
@@ -132,7 +130,6 @@ export function FailuresModal({ open, onClose, groups }: FailuresModalProps) {
           })}
         </div>
 
-        {/* Footer */}
         <div style={styles.footer}>
           <button style={styles.footerClose} onClick={onClose}>Close</button>
         </div>

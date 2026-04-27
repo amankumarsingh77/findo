@@ -48,9 +48,7 @@ function App() {
 
   useEffect(() => {
     if (indexingStatus.isRunning && !prevIsRunningRef.current) {
-      // New indexing run started — reset dismissed state so bar reappears
       setIndexingDismissed(false);
-      // Close failures modal so stale content is not shown (REQ-056)
       setShowFailuresModal(false);
     }
     prevIsRunningRef.current = indexingStatus.isRunning;
@@ -63,7 +61,6 @@ function App() {
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Settings panel state
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('folders');
 
@@ -189,11 +186,8 @@ function App() {
 
   const { isSuppressed } = useHideSuppression();
   useEffect(() => {
-    // Skip the auto-hide while a native OS dialog (e.g. directory picker) is
-    // open. The dialog steals focus, fires blur on the Wails window, and then
-    // the modal sheet gets dismissed along with its now-hidden parent —
-    // exactly the bug users reported with "Add folder".
-    // Also skip if settings panel or popover is open.
+    // Skip auto-hide while a native OS dialog is open. The dialog steals focus,
+    // fires blur on the Wails window, and would otherwise hide its parent.
     const handleBlur = () => {
       if (isSuppressed()) return;
       const w = window as unknown as Record<string, unknown>;

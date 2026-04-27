@@ -31,7 +31,6 @@ func (a *App) SearchWithFilters(raw string, semanticQuery string, denyList []str
 	a.logger.Debug("search_with_filters: start", "raw", raw, "offline", isOffline, "deny_list_len", len(denyList))
 	if isOffline {
 		a.logger.Debug("search_with_filters: offline mode, using filename search only")
-		// Use the most informative semantic query available; fall back to raw.
 		grammarSpecOffline := query.Parse(raw)
 		offlineQuery := semanticQuery
 		if offlineQuery == "" {
@@ -43,7 +42,6 @@ func (a *App) SearchWithFilters(raw string, semanticQuery string, denyList []str
 		return a.searchFilenameOnly(offlineQuery)
 	}
 
-	// Get current FilterSpec (from cache or grammar).
 	grammarSpec := query.Parse(raw)
 	grammarFilterCount := len(grammarSpec.Must) + len(grammarSpec.MustNot) + len(grammarSpec.Should)
 	a.logger.Debug("search_with_filters: grammar parsed",
@@ -73,19 +71,16 @@ func (a *App) SearchWithFilters(raw string, semanticQuery string, denyList []str
 		"source", mergedSpec.Source,
 	)
 
-	// Apply denylist.
 	denyClauseKeys := parseDenyList(denyList)
 	if len(denyClauseKeys) > 0 {
 		a.logger.Debug("search_with_filters: applying denylist", "deny_count", len(denyClauseKeys))
 	}
 	mergedSpec = query.Merge(mergedSpec, query.FilterSpec{}, denyClauseKeys)
 
-	// Override semantic query if provided.
 	if semanticQuery != "" {
 		mergedSpec.SemanticQuery = semanticQuery
 	}
 
-	// Classify the query; only embed for content/hybrid kinds to save Gemini calls.
 	queryText := mergedSpec.SemanticQuery
 	if queryText == "" {
 		queryText = raw
@@ -125,7 +120,6 @@ func (a *App) SearchWithFilters(raw string, semanticQuery string, denyList []str
 		"should", len(mergedSpec.Should),
 	)
 
-	// Route through SearchUnified; surface typed errors to the caller.
 	searchResult, err := a.engine.SearchUnified(a.ctx, queryText, queryVec, mergedSpec, 20)
 	if err != nil {
 		if errors.Is(err, apperr.ErrModelMismatch) {
@@ -163,7 +157,6 @@ func (a *App) SearchWithFilters(raw string, semanticQuery string, denyList []str
 	}, nil
 }
 
-// searchFilenameOnly runs a filename-contains search and returns results as DTOs.
 func (a *App) searchFilenameOnly(queryText string) (SearchWithFiltersResult, error) {
 	if a.store == nil || queryText == "" {
 		return SearchWithFiltersResult{}, nil

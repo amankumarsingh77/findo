@@ -14,10 +14,6 @@ import (
 	"google.golang.org/genai"
 )
 
-// ---------------------------------------------------------------------------
-// Types used by the golden eval harness
-// ---------------------------------------------------------------------------
-
 type goldenClause struct {
 	Field     string  `json:"field"`
 	Op        string  `json:"op"`
@@ -57,10 +53,6 @@ type caseScore struct {
 	score float64
 }
 
-// ---------------------------------------------------------------------------
-// Fake LLM generate function
-// ---------------------------------------------------------------------------
-
 // fakeGenerate returns a generateContentFn that routes by query text.
 // Responses use Content.Parts[0].Text (JSON string), not FunctionCall.
 // This pre-builds the response shape that Phase 4's direct-JSON decode path uses.
@@ -95,10 +87,6 @@ func fakeGenerate(cases []goldenCase) generateContentFn {
 		}, nil
 	}
 }
-
-// ---------------------------------------------------------------------------
-// JSONL fixture loader
-// ---------------------------------------------------------------------------
 
 // loadGoldenFixture reads a JSONL file and returns parsed goldenCase values.
 func loadGoldenFixture(t *testing.T, path string) []goldenCase {
@@ -149,10 +137,6 @@ func normalizeClauseValues(clauses []goldenClause) []goldenClause {
 	return out
 }
 
-// ---------------------------------------------------------------------------
-// Baseline loader / writer
-// ---------------------------------------------------------------------------
-
 func loadBaseline(t *testing.T, path string) goldenBaseline {
 	t.Helper()
 	data, err := os.ReadFile(testdataPath(path))
@@ -185,10 +169,7 @@ func testdataPath(path string) string {
 	return filepath.Join("testdata", filepath.Base(path))
 }
 
-// ---------------------------------------------------------------------------
-// decodeTextJSONResponse — Phase 4 decode path (pre-built in Phase 1).
 // Reads llmResponse JSON from Content.Parts[0].Text instead of FunctionCall.
-// ---------------------------------------------------------------------------
 
 func decodeTextJSONResponse(resp *genai.GenerateContentResponse) (FilterSpec, error) {
 	if resp == nil || len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil {
@@ -208,10 +189,6 @@ func decodeTextJSONResponse(resp *genai.GenerateContentResponse) (FilterSpec, er
 	}
 	return convertLLMResponseToSpec(llmResp), nil
 }
-
-// ---------------------------------------------------------------------------
-// runGoldenCase — executes one case and returns the result FilterSpec + outcome.
-// ---------------------------------------------------------------------------
 
 func runGoldenCase(t *testing.T, c goldenCase, parser *LLMParser) (FilterSpec, ParseOutcome) {
 	t.Helper()

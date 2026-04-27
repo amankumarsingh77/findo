@@ -64,7 +64,6 @@ func TestApply_FreshDB(t *testing.T) {
 		}
 	}
 
-	// Monotonic applied_at.
 	for i := 1; i < len(got); i++ {
 		prev, _ := time.Parse(time.RFC3339, got[i-1].appliedAt)
 		cur, _ := time.Parse(time.RFC3339, got[i].appliedAt)
@@ -78,15 +77,12 @@ func TestApply_FreshDB(t *testing.T) {
 func TestApply_SkipsAlreadyApplied(t *testing.T) {
 	db := openMemDB(t)
 
-	// Create the migrations table and stamp version 1 without running SQL.
 	if _, err := db.Exec(`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`INSERT INTO schema_migrations VALUES (1, ?)`, time.Now().UTC().Format(time.RFC3339)); err != nil {
 		t.Fatal(err)
 	}
-	// Also hand-create the tables that migration 1 would create, so migration 2 (ALTER TABLE chunks)
-	// and migration 6 (ALTER TABLE files) can find the expected tables.
 	if _, err := db.Exec(`CREATE TABLE chunks (id INTEGER PRIMARY KEY, file_id INTEGER, vector_id TEXT UNIQUE, chunk_index INTEGER, start_time REAL, end_time REAL)`); err != nil {
 		t.Fatal(err)
 	}
@@ -106,19 +102,15 @@ func TestApply_SkipsAlreadyApplied(t *testing.T) {
 		t.Fatalf("expected 7 rows, got %d", count)
 	}
 
-	// Version 2's ALTER TABLE must have run: chunks.vector_blob column exists.
 	if !columnExists(t, db, "chunks", "vector_blob") {
 		t.Error("expected vector_blob column after migration 2 ran")
 	}
-	// Version 3 table exists.
 	if !tableExists(t, db, "parsed_query_cache") {
 		t.Error("expected parsed_query_cache after migration 3 ran")
 	}
-	// Version 5's ALTER TABLE must have run: schema_version column exists.
 	if !columnExists(t, db, "parsed_query_cache", "schema_version") {
 		t.Error("expected schema_version column after migration 5 ran")
 	}
-	// Version 6's ALTER TABLE must have run: derived columns exist.
 	for _, col := range []string{"basename", "parent", "stem"} {
 		if !columnExists(t, db, "files", col) {
 			t.Errorf("expected files.%s column after migration 6 ran", col)
@@ -179,7 +171,6 @@ func TestApply_TransactionalRollback(t *testing.T) {
 		t.Errorf("error should name failing migration file, got: %v", err)
 	}
 
-	// First migration committed, second rolled back.
 	var versions []int
 	rows, qerr := db.Query(`SELECT version FROM schema_migrations ORDER BY version`)
 	if qerr != nil {
@@ -194,7 +185,6 @@ func TestApply_TransactionalRollback(t *testing.T) {
 	if len(versions) != 1 || versions[0] != 1 {
 		t.Errorf("expected only version 1 stamped, got %v", versions)
 	}
-	// Partial table from failed migration must not exist.
 	if tableExists(t, db, "should_not_exist") {
 		t.Error("partial table from rolled-back migration exists")
 	}
@@ -242,7 +232,6 @@ func TestApply_LegacyAdoption(t *testing.T) {
 		t.Fatalf("seed legacy schema: %v", err)
 	}
 
-	// Apply must stamp 1..3 without attempting CREATE on existing tables.
 	if err := Apply(db, migratorTestLogger); err != nil {
 		t.Fatalf("Apply on legacy DB: %v", err)
 	}
@@ -251,7 +240,6 @@ func TestApply_LegacyAdoption(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	// Legacy adoption stamps 1..3; migrations 004, 005, 006, and 007 are real new migrations that run on top.
 	if count != 7 {
 		t.Fatalf("expected 7 rows after legacy adoption + migrations 004+005+006+007, got %d", count)
 	}
@@ -303,17 +291,14 @@ func TestStore_NewStore_RunsMigrations(t *testing.T) {
 	if !columnExists(t, s.db, "chunks", "vector_blob") {
 		t.Error("expected chunks.vector_blob column to exist")
 	}
-	// Migration 006: derived path columns.
 	for _, col := range []string{"basename", "parent", "stem"} {
 		if !columnExists(t, s.db, "files", col) {
 			t.Errorf("expected files.%s column to exist after migration 006", col)
 		}
 	}
-	// Migration 007: FTS5 virtual table.
 	if !tableExists(t, s.db, "filename_search") {
 		t.Error("expected filename_search FTS5 virtual table to exist after migration 007")
 	}
-	// FilenameFTSAvailable should report true when the table exists.
 	if !s.FilenameFTSAvailable() {
 		t.Error("expected FilenameFTSAvailable() == true after successful migration 007")
 	}
@@ -481,7 +466,6 @@ func TestMigration_006_BackfillsDerivedColumns(t *testing.T) {
 		t.Fatalf("seed v5 schema: %v", err)
 	}
 
-	// Seed fixture rows covering the path shapes we care about.
 	type fixture struct {
 		path         string
 		wantBasename string
@@ -507,7 +491,6 @@ func TestMigration_006_BackfillsDerivedColumns(t *testing.T) {
 		}
 	}
 
-	// Stamp versions 1–5 as already applied so Apply only runs migration 6.
 	if _, err := db.Exec(`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)`); err != nil {
 		t.Fatal(err)
 	}
@@ -522,14 +505,12 @@ func TestMigration_006_BackfillsDerivedColumns(t *testing.T) {
 		t.Fatalf("Apply: %v", err)
 	}
 
-	// Assert derived columns are now present.
 	for _, col := range []string{"basename", "parent", "stem"} {
 		if !columnExists(t, db, "files", col) {
 			t.Errorf("expected files.%s column after migration 006", col)
 		}
 	}
 
-	// Assert each seeded row was backfilled correctly.
 	rows, err := db.Query(`SELECT path, basename, parent, stem FROM files ORDER BY path`)
 	if err != nil {
 		t.Fatalf("query: %v", err)
@@ -613,8 +594,6 @@ func TestMigration_006_BatchedBackfill_12kRows(t *testing.T) {
 		t.Fatalf("seed v5 schema: %v", err)
 	}
 
-	// Insert 12 000 rows with deterministic paths spread across different
-	// directory depths to exercise the full path-decomposition formula.
 	const total = 12000
 	tx, err := db.Begin()
 	if err != nil {
@@ -635,7 +614,6 @@ func TestMigration_006_BatchedBackfill_12kRows(t *testing.T) {
 		t.Fatalf("commit seed tx: %v", err)
 	}
 
-	// Stamp versions 1–5 as already applied so Apply only runs migration 006.
 	if _, err := db.Exec(`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)`); err != nil {
 		t.Fatal(err)
 	}
@@ -650,7 +628,6 @@ func TestMigration_006_BatchedBackfill_12kRows(t *testing.T) {
 		t.Fatalf("Apply (migration 006 with 12k rows): %v", err)
 	}
 
-	// All rows must have non-empty basename and parent.
 	var emptyBasename, emptyStem int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM files WHERE basename = ''`).Scan(&emptyBasename); err != nil {
 		t.Fatalf("count empty basename: %v", err)
@@ -665,7 +642,6 @@ func TestMigration_006_BatchedBackfill_12kRows(t *testing.T) {
 		t.Errorf("EDGE-4: %d rows still have empty stem after batched backfill", emptyStem)
 	}
 
-	// Spot-check a known row.
 	var basename, parent, stem string
 	if err := db.QueryRow(
 		`SELECT basename, parent, stem FROM files WHERE path = '/home/user/dir0000/file00000.txt'`,
@@ -682,7 +658,6 @@ func TestMigration_006_BatchedBackfill_12kRows(t *testing.T) {
 		t.Errorf("spot-check: stem = %q, want %q", stem, "file00000")
 	}
 
-	// Total row count must be intact.
 	var count int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM files`).Scan(&count); err != nil {
 		t.Fatalf("count rows: %v", err)
@@ -691,8 +666,6 @@ func TestMigration_006_BatchedBackfill_12kRows(t *testing.T) {
 		t.Errorf("expected %d rows, got %d after migration 006", total, count)
 	}
 }
-
-// --- helpers ---
 
 func tableExists(t *testing.T, db *sql.DB, name string) bool {
 	t.Helper()

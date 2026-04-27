@@ -105,7 +105,7 @@ type LLMParser struct {
 	model      string
 	maxRetries int
 	logger     *slog.Logger
-	generate   generateContentFn // testable seam; defaults to client.Models.GenerateContent
+	generate   generateContentFn
 }
 
 // NewLLMParser creates an LLMParser using DefaultLLMConfig. Retained for
@@ -120,8 +120,6 @@ func NewLLMParserWithConfig(client *genai.Client, limiter interface{ Allow() boo
 	if cfg.Model == "" {
 		cfg.Model = def.Model
 	}
-	// MaxRetries: 0 is a valid value (no retries), so only fall back on
-	// negative values.
 	if cfg.MaxRetries < 0 {
 		cfg.MaxRetries = def.MaxRetries
 	}
@@ -307,14 +305,12 @@ func (p *LLMParser) parseWithRetry(ctx context.Context, query string, grammarSpe
 		resp, err := p.generate(ctx, p.model, contents, config)
 		if err != nil {
 			lastErr = err
-			// Track the best retry-after hint we've seen across all attempts.
 			if ms := parseRetryAfterMs(err); ms > 0 {
 				lastRetryAfterMs = ms
 			}
 			if attempt < maxRetries {
 				continue
 			}
-			// All attempts exhausted — classify the terminal error.
 			return classifyTerminalError(lastErr, lastRetryAfterMs, grammarSpec), nil
 		}
 
@@ -322,7 +318,6 @@ func (p *LLMParser) parseWithRetry(ctx context.Context, query string, grammarSpe
 		if decodeErr != nil {
 			p.logger.Debug("decode JSON response failed", "error", decodeErr, "attempt", attempt)
 			if attempt == maxRetries {
-				// No successful decode ever occurred; return grammarSpec per REQ-004.
 				if !haveDecoded {
 					return ParseResult{Spec: grammarSpec, Outcome: OutcomeOK}, nil
 				}
@@ -345,7 +340,6 @@ func (p *LLMParser) parseWithRetry(ctx context.Context, query string, grammarSpe
 		} else {
 			p.logger.Debug("validator failed", "error", err, "attempt", attempt)
 			if attempt == maxRetries {
-				// Soft success: model responded but structured fields were imperfect.
 				return ParseResult{Spec: spec, Outcome: OutcomeOK}, nil
 			}
 			if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
@@ -357,7 +351,6 @@ func (p *LLMParser) parseWithRetry(ctx context.Context, query string, grammarSpe
 			})
 		}
 	}
-	// Exhausted retries without any successful decode; return grammarSpec per REQ-004.
 	if !haveDecoded {
 		return ParseResult{Spec: grammarSpec, Outcome: OutcomeOK}, nil
 	}

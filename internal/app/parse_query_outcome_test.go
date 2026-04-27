@@ -11,7 +11,6 @@ import (
 	"findo/internal/query"
 )
 
-// stubLLMParser is a fake llmQueryParser that returns a pre-canned ParseResult.
 type stubLLMParser struct {
 	result query.ParseResult
 }
@@ -20,13 +19,11 @@ func (s *stubLLMParser) Parse(_ context.Context, _ string, _ query.FilterSpec) (
 	return s.result, nil
 }
 
-// stubParsedQueryCache records how many times Set has been called.
 type stubParsedQueryCache struct {
 	setCalls int
 }
 
 func (s *stubParsedQueryCache) Get(_ string) (*query.FilterSpec, error) {
-	// Always miss, so the LLM path is exercised.
 	return nil, nil
 }
 
@@ -35,29 +32,19 @@ func (s *stubParsedQueryCache) Set(_ string, _ query.FilterSpec) error {
 	return nil
 }
 
-// newOutcomeTestApp builds a minimal App with a stub parser and cache.
-// The query passed to ParseQuery must trigger the LLM; use queries with
-// temporal/negation/file-type keywords or > 6 tokens.
 func newOutcomeTestApp(t *testing.T, parser llmQueryParser, cache parsedQueryCacheIface) *App {
 	t.Helper()
 	cfg := config.DefaultConfig()
-	// Use defaults for trigger — queries in these tests carry file-type keywords
-	// or are long enough to trigger LLM via the heuristic.
 	return &App{
 		cfg:              cfg,
 		ctx:              context.Background(),
 		logger:           slog.Default(),
 		llmParser:        parser,
 		parsedQueryCache: cache,
-		// embedder non-nil so isOffline=false and snapshotEmbedderState returns non-nil emb.
-		embedder: embedder.NewFake("fake-model", 768),
+		embedder:         embedder.NewFake("fake-model", 768),
 	}
 }
 
-// TestParseQuery_OutcomeOK_WritesCache — REQ-005
-// When the LLM parser returns OutcomeOK, the result must carry chips, no
-// ErrorCode / Warning, and the cache.Set must be called exactly once.
-// Query uses "documents" to match fileTypeRe and trigger the LLM heuristic.
 func TestParseQuery_OutcomeOK_WritesCache(t *testing.T) {
 	okSpec := query.FilterSpec{
 		SemanticQuery: "budget documents from last week",
@@ -70,7 +57,6 @@ func TestParseQuery_OutcomeOK_WritesCache(t *testing.T) {
 	cache := &stubParsedQueryCache{}
 
 	a := newOutcomeTestApp(t, parser, cache)
-	// "documents" triggers fileTypeRe; "last" triggers temporalRe — LLM will be invoked.
 	result, err := a.ParseQuery("documents from last week")
 	if err != nil {
 		t.Fatalf("ParseQuery returned error: %v", err)
@@ -86,16 +72,11 @@ func TestParseQuery_OutcomeOK_WritesCache(t *testing.T) {
 	}
 }
 
-// TestParseQuery_OutcomeTimeout_SetsWarning_NoCacheWrite — REQ-006, EDGE-010
-// On OutcomeTimeout, Warning must be "query_parse_timeout", ErrorCode must be
-// empty, chips must come from the grammar parse, and cache.Set must NOT be called.
 func TestParseQuery_OutcomeTimeout_SetsWarning_NoCacheWrite(t *testing.T) {
-	// grammarSpec will be used by the parser on timeout.
 	parser := &stubLLMParser{result: query.ParseResult{Outcome: query.OutcomeTimeout}}
 	cache := &stubParsedQueryCache{}
 
 	a := newOutcomeTestApp(t, parser, cache)
-	// "kind:image" is parsed by grammar so we'll get at least one chip.
 	result, err := a.ParseQuery("kind:image recent photos")
 	if err != nil {
 		t.Fatalf("ParseQuery returned error: %v", err)
@@ -114,16 +95,11 @@ func TestParseQuery_OutcomeTimeout_SetsWarning_NoCacheWrite(t *testing.T) {
 	}
 }
 
-// TestParseQuery_OutcomeFailed_SetsErrorCode_NoCacheWrite — REQ-007
-// On OutcomeFailed, ErrorCode must be ERR_QUERY_PARSE_FAILED, Chips must be
-// empty, and cache.Set must NOT be called.
-// Query uses "photos" (fileTypeRe) + >6 tokens to ensure LLM invocation.
 func TestParseQuery_OutcomeFailed_SetsErrorCode_NoCacheWrite(t *testing.T) {
 	parser := &stubLLMParser{result: query.ParseResult{Outcome: query.OutcomeFailed}}
 	cache := &stubParsedQueryCache{}
 
 	a := newOutcomeTestApp(t, parser, cache)
-	// "photos" triggers fileTypeRe; >6 tokens ensures LLM is invoked.
 	result, err := a.ParseQuery("show me all my vacation photos from the beach resort trip")
 	if err != nil {
 		t.Fatalf("ParseQuery returned error: %v", err)
@@ -139,10 +115,6 @@ func TestParseQuery_OutcomeFailed_SetsErrorCode_NoCacheWrite(t *testing.T) {
 	}
 }
 
-// TestParseQuery_OutcomeRateLimited_PropagatesRetryAfterMs_NoCacheWrite — REQ-008
-// On OutcomeRateLimited, ErrorCode must be ERR_QUERY_RATE_LIMITED, RetryAfterMs
-// must be propagated, Chips must be empty, and cache.Set must NOT be called.
-// Query uses "photos" (fileTypeRe) + >6 tokens to ensure LLM invocation.
 func TestParseQuery_OutcomeRateLimited_PropagatesRetryAfterMs_NoCacheWrite(t *testing.T) {
 	const wantRetryAfterMs int64 = 15000
 	parser := &stubLLMParser{result: query.ParseResult{
@@ -152,7 +124,6 @@ func TestParseQuery_OutcomeRateLimited_PropagatesRetryAfterMs_NoCacheWrite(t *te
 	cache := &stubParsedQueryCache{}
 
 	a := newOutcomeTestApp(t, parser, cache)
-	// "photos" triggers fileTypeRe; >6 tokens ensures LLM is invoked.
 	result, err := a.ParseQuery("show me all my vacation photos from the beach resort trip")
 	if err != nil {
 		t.Fatalf("ParseQuery returned error: %v", err)

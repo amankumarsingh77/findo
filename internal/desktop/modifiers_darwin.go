@@ -8,10 +8,8 @@ import (
 	"golang.design/x/hotkey"
 )
 
-// modCmd is the Command key on macOS.
 var modCmd = hotkey.ModCmd
 
-// modAlt is the Option key on macOS.
 var modAlt = hotkey.ModOption
 
 // HumanReadableHotkey returns macOS symbol notation, e.g. "⌘⇧Space".

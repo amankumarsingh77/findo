@@ -431,7 +431,6 @@ func TestHasMissingVectorBlobs_TrueWhenNull(t *testing.T) {
 		SizeBytes: 100, ModifiedAt: time.Now(), IndexedAt: time.Now(),
 	})
 
-	// Insert chunk with nil VectorBlob — missing vector data.
 	_, err = s.InsertChunk(ChunkRecord{
 		FileID: fileID, VectorID: "vec-null-1", ChunkIndex: 0,
 		VectorBlob: nil,
@@ -462,7 +461,6 @@ func TestHasMissingVectorBlobs_FalseWhenPresent(t *testing.T) {
 		SizeBytes: 100, ModifiedAt: time.Now(), IndexedAt: time.Now(),
 	})
 
-	// Insert chunk with valid VectorBlob.
 	blob := VecToBlob([]float32{0.1, 0.2, 0.3})
 	_, err = s.InsertChunk(ChunkRecord{
 		FileID: fileID, VectorID: "vec-present-1", ChunkIndex: 0,
@@ -607,7 +605,6 @@ func TestGetAllChunks_Returns6Chunks(t *testing.T) {
 		t.Fatalf("expected 6 chunks, got %d", len(chunks))
 	}
 
-	// Verify each chunk has correct file_id and vector_id set.
 	for _, c := range chunks {
 		if c.FileID != fileID1 && c.FileID != fileID2 {
 			t.Fatalf("unexpected file_id %d", c.FileID)
@@ -700,8 +697,6 @@ func TestGetAllFiles_Returns3Files(t *testing.T) {
 	}
 }
 
-// --- Query cache tests ---
-
 func TestQueryCache_RoundTrip(t *testing.T) {
 	s, err := NewStore(":memory:", testLogger)
 	if err != nil {
@@ -752,12 +747,10 @@ func TestQueryCache_Normalization(t *testing.T) {
 	defer s.Close()
 
 	vec := []float32{1.0, 2.0, 3.0}
-	// Store with padded and mixed-case key.
 	if err := s.SetQueryCache("  Hello World  ", vec); err != nil {
 		t.Fatalf("SetQueryCache failed: %v", err)
 	}
 
-	// Retrieve with normalized form.
 	got, err := s.GetQueryCache("hello world")
 	if err != nil {
 		t.Fatalf("GetQueryCache failed: %v", err)
@@ -815,7 +808,6 @@ func TestQueryCache_Eviction_ZeroTTL_RemovesEntry(t *testing.T) {
 		t.Fatalf("SetQueryCache failed: %v", err)
 	}
 
-	// Zero duration means cutoff = now, so everything inserted before now is evicted.
 	if err := s.EvictOldQueryCache(0); err != nil {
 		t.Fatalf("EvictOldQueryCache failed: %v", err)
 	}
@@ -841,7 +833,6 @@ func TestQueryCache_Eviction_LargeTTL_KeepsEntry(t *testing.T) {
 		t.Fatalf("SetQueryCache failed: %v", err)
 	}
 
-	// 24h TTL — a freshly inserted entry should survive.
 	if err := s.EvictOldQueryCache(24 * time.Hour); err != nil {
 		t.Fatalf("EvictOldQueryCache failed: %v", err)
 	}
@@ -854,8 +845,6 @@ func TestQueryCache_Eviction_LargeTTL_KeepsEntry(t *testing.T) {
 		t.Fatal("expected entry to be kept, but it was evicted")
 	}
 }
-
-// --- Phase 1: NL Query Understanding - Schema + Store Layer tests ---
 
 func TestCountFiltered_FileType(t *testing.T) {
 	s, err := NewStore(":memory:", testLogger)
@@ -1042,14 +1031,12 @@ func TestGetVectorBlobs_SkipsNullBlob(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Insert chunk with no VectorBlob (nil/empty)
 	_, err = s.InsertChunk(ChunkRecord{
 		FileID: fileID, VectorID: "vec-noblob-001", ChunkIndex: 0,
 	})
 	if err != nil {
 		t.Fatalf("InsertChunk no-blob failed: %v", err)
 	}
-	// Insert chunk with a blob
 	_, err = s.InsertChunk(ChunkRecord{
 		FileID: fileID, VectorID: "vec-noblob-002", ChunkIndex: 1,
 		VectorBlob: vecToBlob([]float32{1.0, 2.0}),
@@ -1113,7 +1100,6 @@ func TestEvictOldParsedQueryCache_LeavesRecent(t *testing.T) {
 	}
 	defer s.Close()
 
-	// Seed 5 old entries by direct SQL
 	oldTS := time.Now().Add(-31 * 24 * time.Hour).Unix()
 	for i := 0; i < 5; i++ {
 		_, err := s.db.Exec(`INSERT INTO parsed_query_cache (query_text_normalized, spec_json, created_at, last_used_at) VALUES (?,?,?,?)`,
@@ -1123,7 +1109,6 @@ func TestEvictOldParsedQueryCache_LeavesRecent(t *testing.T) {
 		}
 	}
 
-	// Seed 5 recent entries
 	for i := 0; i < 5; i++ {
 		err := s.UpsertParsedQueryCache(fmt.Sprintf("recent query %d", i), `{}`, 2)
 		if err != nil {
@@ -1213,7 +1198,6 @@ func TestCountFiles_ReturnsTotal(t *testing.T) {
 }
 
 func TestAlterTable_Idempotent(t *testing.T) {
-	// Use a temp file to test idempotency across two NewStore calls
 	dir := t.TempDir()
 	dbPath := dir + "/test.db"
 
@@ -1230,8 +1214,6 @@ func TestAlterTable_Idempotent(t *testing.T) {
 	s2.Close()
 }
 
-// TestSearchResult_HasDistanceField verifies the Distance field exists on SearchResult.
-// This is a compile-time check — the test fails to compile if the field is absent.
 func TestSearchResult_HasDistanceField(t *testing.T) {
 	r := SearchResult{
 		Distance: 0.25,
@@ -1311,8 +1293,6 @@ func TestInsertChunk_WritesEmbeddingModelAndDims(t *testing.T) {
 		t.Errorf("embedding_dims = %d, want 64", dims)
 	}
 }
-
-// --- Phase 1 (filename search): derived column tests ---
 
 // TestUpsertFile_PopulatesDerivedCols verifies that UpsertFile writes basename,
 // parent, and stem for a new file and keeps them accurate on update.
@@ -1404,7 +1384,6 @@ func TestUpsertFile_UpdatesDerivedCols(t *testing.T) {
 		t.Fatalf("first UpsertFile: %v", err)
 	}
 
-	// Second upsert updates content_hash; derived cols must still be correct.
 	id2, err := s.UpsertFile(FileRecord{
 		Path: path, FileType: "text", Extension: ".txt",
 		SizeBytes: 200, ModifiedAt: now, IndexedAt: now, ContentHash: "v2",

@@ -43,10 +43,6 @@ func makeChunks(n int) []ChunkInput {
 	return chunks
 }
 
-// ---------------------------------------------------------------------------
-// Existing RateLimiter tests
-// ---------------------------------------------------------------------------
-
 func TestRateLimiter_AllowsWithinLimit(t *testing.T) {
 	rl := NewRateLimiter(5, time.Second)
 	for i := 0; i < 5; i++ {
@@ -72,12 +68,8 @@ func TestRateLimiter_AllowsAfterWindowExpires(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// RateLimiter global pause tests
-// ---------------------------------------------------------------------------
-
 func TestRateLimiter_PauseUntil_BlocksWait(t *testing.T) {
-	rl := NewRateLimiter(100, time.Minute) // generous limit so Allow() won't block
+	rl := NewRateLimiter(100, time.Minute)
 
 	pause := time.Now().Add(150 * time.Millisecond)
 	rl.PauseUntil(pause)
@@ -100,7 +92,7 @@ func TestRateLimiter_PauseUntil_LaterTimeWins(t *testing.T) {
 	late := time.Now().Add(200 * time.Millisecond)
 
 	rl.PauseUntil(late)
-	rl.PauseUntil(early) // should be ignored; late is later
+	rl.PauseUntil(early)
 
 	got := rl.PausedUntil()
 	if !got.Equal(late) {
@@ -125,7 +117,6 @@ func TestRateLimiter_WaitIfPaused_ReturnsImmediatelyWhenNotPaused(t *testing.T) 
 func TestRateLimiter_Wait_ContextCancellation(t *testing.T) {
 	rl := NewRateLimiter(100, time.Minute)
 
-	// Pause for 10 seconds — context will cancel before it expires
 	rl.PauseUntil(time.Now().Add(10 * time.Second))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
@@ -139,10 +130,6 @@ func TestRateLimiter_Wait_ContextCancellation(t *testing.T) {
 		t.Fatalf("expected DeadlineExceeded, got: %v", err)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// parseRetryAfter tests
-// ---------------------------------------------------------------------------
 
 func TestParseRetryAfter_WithRetryDelay(t *testing.T) {
 	err := errors.New(`rpc error: code = ResourceExhausted desc = retry_delay:{seconds:30}`)
@@ -160,11 +147,9 @@ func TestParseRetryAfter_NoRetryDelay(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
 // EmbedBatch tests — exercise the real (*Embedder).EmbedBatch path via an
 // injected embedFn, so any regression in the production batching loop is
 // caught by these assertions.
-// ---------------------------------------------------------------------------
 
 func TestEmbedBatch_EmptyInput(t *testing.T) {
 	e := newTestEmbedder(func(batchSize int) ([][]float32, error) {
@@ -265,7 +250,7 @@ func TestEmbedBatch_PreservesOrder(t *testing.T) {
 // never leak to callers that might commit them.
 func TestEmbedBatch_CardinalityMismatch(t *testing.T) {
 	e := newTestEmbedder(func(batchSize int) ([][]float32, error) {
-		return makeVecs(batchSize-1, 0), nil // one short on purpose
+		return makeVecs(batchSize-1, 0), nil
 	})
 
 	_, err := e.EmbedBatch(context.Background(), makeChunks(10))
@@ -287,11 +272,6 @@ func TestEmbedBatch_PropagatesError(t *testing.T) {
 		t.Fatalf("expected errors.Is(err, boom), got %v", err)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// GeminiConfig plumbing — verifies config knobs reach the constructed embedder
-// (REF-042 from the maintainability refactor).
-// ---------------------------------------------------------------------------
 
 func TestGeminiConfig_AppliedToEmbedder(t *testing.T) {
 	cfg := GeminiConfig{
@@ -340,10 +320,6 @@ func TestGeminiConfig_AppliedToEmbedder(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// REQ-015 / EDGE-005: 429 terminal errors must satisfy errors.Is(apperr.ErrRateLimited)
-// ---------------------------------------------------------------------------
-
 // newFastEmbedder creates a test embedder with near-zero delays so tests run
 // without real backoff waits.
 func newFastEmbedder(doer embedFunc) *GeminiEmbedder {
@@ -378,7 +354,6 @@ func TestEmbedQueryWrapsRateLimitedOn429(t *testing.T) {
 	if errors.Is(err, apperr.ErrEmbedFailed) {
 		t.Errorf("expected errors.Is(err, apperr.ErrEmbedFailed) == false, but it was true")
 	}
-	// Original cause must be preserved via Unwrap.
 	if !errors.Is(err, rateLimitErr) {
 		t.Errorf("expected original cause to be preserved via Unwrap, but errors.Is(err, rateLimitErr) is false")
 	}
@@ -419,7 +394,7 @@ func TestEmbedQueryRateLimitedAfterRetriesExhausted(t *testing.T) {
 	}
 
 	e := newFastEmbedder(doer)
-	e.maxRetries = 1 // one retry, then exhausted
+	e.maxRetries = 1
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

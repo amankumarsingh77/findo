@@ -1,5 +1,3 @@
-// Package query — golden eval harness.
-// PLACEHOLDER: 5-case fixture; grows to 200 cases in Phase 2.
 package query
 
 import (
@@ -13,10 +11,6 @@ import (
 	"testing"
 	"time"
 )
-
-// ---------------------------------------------------------------------------
-// Component weights — must sum to 1.0 exactly.
-// ---------------------------------------------------------------------------
 
 var componentWeights = map[string]float64{
 	"file_type":   0.20,
@@ -47,10 +41,6 @@ var fieldForComponent = map[string]FieldEnum{
 	"extension":   FieldExtension,
 	"path":        FieldPath,
 }
-
-// ---------------------------------------------------------------------------
-// TestGoldenEval — main harness
-// ---------------------------------------------------------------------------
 
 func TestGoldenEval(t *testing.T) {
 	cases := loadGoldenFixture(t, "testdata/golden_queries.jsonl")
@@ -119,10 +109,6 @@ func TestGoldenEval(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestGoldenFixtureShape — structural validation
-// ---------------------------------------------------------------------------
-
 func TestGoldenFixtureShape(t *testing.T) {
 	cases := loadGoldenFixture(t, "testdata/golden_queries.jsonl")
 	if len(cases) == 0 {
@@ -147,10 +133,6 @@ func TestGoldenFixtureShape(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestGoldenBaselineShape — structural validation
-// ---------------------------------------------------------------------------
-
 func TestGoldenBaselineShape(t *testing.T) {
 	baseline := loadBaseline(t, "testdata/golden_baseline.json")
 	if math.IsNaN(baseline.Overall) || math.IsInf(baseline.Overall, 0) {
@@ -160,10 +142,6 @@ func TestGoldenBaselineShape(t *testing.T) {
 		t.Error("baseline.per_category must not be nil")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestScorerWeights — weights must sum to 1.0
-// ---------------------------------------------------------------------------
 
 func TestScorerWeights(t *testing.T) {
 	sum := 0.0
@@ -175,10 +153,6 @@ func TestScorerWeights(t *testing.T) {
 		t.Errorf("componentWeights sum = %.10f, want 1.0", sum)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestScorerValueKinds — unit-test matching rules per value_kind
-// ---------------------------------------------------------------------------
 
 func TestScorerValueKinds(t *testing.T) {
 	t.Run("unix_within_tolerance", func(t *testing.T) {
@@ -237,10 +211,6 @@ func TestScorerValueKinds(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// TestOverallFloor — fault-inject a failing case, verify gate logic fires.
-// ---------------------------------------------------------------------------
-
 func TestOverallFloor(t *testing.T) {
 	// With 5 cases where one scores 0.0: mean = 0.80 < 0.90 → gate fires.
 	cases := []goldenCase{
@@ -279,10 +249,6 @@ func TestOverallFloor(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestCategoryRegression — fault-inject inflated baseline, verify gate fires.
-// ---------------------------------------------------------------------------
-
 func TestCategoryRegression(t *testing.T) {
 	currentScores := map[string]float64{
 		"kind": 0.85,
@@ -311,10 +277,6 @@ func TestCategoryRegression(t *testing.T) {
 		t.Fatal("expected regression to be detected with inflated baseline")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestUpdateBaseline — verify writeBaseline round-trips correctly.
-// ---------------------------------------------------------------------------
 
 func TestUpdateBaseline(t *testing.T) {
 	t.Run("read_placeholder_baseline", func(t *testing.T) {

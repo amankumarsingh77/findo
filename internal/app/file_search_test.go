@@ -15,9 +15,6 @@ import (
 	"findo/internal/vectorstore"
 )
 
-// fakeCallTracker implements embedder.Embedder and records how many times
-// EmbedQuery was called. EmbedQuery returns a zero vector so callers can
-// proceed without errors.
 type fakeCallTracker struct {
 	embedQueryCalls int
 }
@@ -34,8 +31,6 @@ func (f *fakeCallTracker) EmbedBatch(_ context.Context, _ []embedder.ChunkInput)
 	return nil, nil
 }
 
-// TestSearch_KindFilename_SkipsEmbedder verifies that when the query classifier
-// returns KindFilename, the embedder is NOT called (saving a Gemini round-trip).
 func TestSearch_KindFilename_SkipsEmbedder(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	s, err := store.NewStore(":memory:", logger)
@@ -58,7 +53,6 @@ func TestSearch_KindFilename_SkipsEmbedder(t *testing.T) {
 		ctx:      context.Background(),
 	}
 
-	// "demo.py" → KindFilename → no embedding call.
 	_, _ = a.Search("demo.py")
 
 	if tracker.embedQueryCalls > 0 {
@@ -66,8 +60,6 @@ func TestSearch_KindFilename_SkipsEmbedder(t *testing.T) {
 	}
 }
 
-// TestSearch_KindHybrid_CallsEmbedder verifies that a hybrid query does call
-// the embedder.
 func TestSearch_KindHybrid_CallsEmbedder(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	s, err := store.NewStore(":memory:", logger)
@@ -90,7 +82,6 @@ func TestSearch_KindHybrid_CallsEmbedder(t *testing.T) {
 		ctx:      context.Background(),
 	}
 
-	// "engine_startup" → KindHybrid (identifier, no extension) → embedding expected.
 	_, _ = a.Search("engine_startup")
 
 	if tracker.embedQueryCalls == 0 {
@@ -98,8 +89,6 @@ func TestSearch_KindHybrid_CallsEmbedder(t *testing.T) {
 	}
 }
 
-// TestBlendedToSearchResultDTO_MapsMatchKindAndHighlights verifies that
-// blendedToSearchResultDTO correctly propagates MatchKind and Highlights.
 func TestBlendedToSearchResultDTO_MapsMatchKindAndHighlights(t *testing.T) {
 	r := search.BlendedResult{
 		File: store.FileRecord{
@@ -132,8 +121,6 @@ func TestBlendedToSearchResultDTO_MapsMatchKindAndHighlights(t *testing.T) {
 	}
 }
 
-// TestBlendedToSearchResultDTO_NoHighlights_EmptySlice verifies that a result
-// with no highlights produces nil Highlights (no JSON field emitted).
 func TestBlendedToSearchResultDTO_NoHighlights_EmptySlice(t *testing.T) {
 	r := search.BlendedResult{
 		File:      store.FileRecord{Path: "/tmp/doc.txt"},
@@ -145,9 +132,6 @@ func TestBlendedToSearchResultDTO_NoHighlights_EmptySlice(t *testing.T) {
 	}
 }
 
-// TestClassifyAndEmbed_FilenameKind_NilVec verifies that classifyAndEmbed
-// returns kind=KindFilename and nil vec for a filename query, without calling
-// the embedder.
 func TestClassifyAndEmbed_FilenameKind_NilVec(t *testing.T) {
 	tracker := &fakeCallTracker{}
 	a := &App{

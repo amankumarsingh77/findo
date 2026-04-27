@@ -144,15 +144,12 @@ func (rc *RetryCoordinator) CancelPath(path string) bool {
 // It drains the buffered channel and decrements pendingCount for each drained job.
 // The pipeline lock is expected to be held by the caller to zero PendingRetryFiles.
 func (rc *RetryCoordinator) DropAll(_ int32) {
-	// Bump all path stamps so any jobs that escape the drain (in-flight in process())
-	// will also be dropped via the pathStamp check.
 	rc.pathMu.Lock()
 	for k := range rc.pathStamps {
 		rc.pathStamps[k]++
 	}
 	rc.pathMu.Unlock()
 
-	// Drain the buffered channel.
 	drained := 0
 	for {
 		select {
@@ -176,7 +173,6 @@ func (rc *RetryCoordinator) loop() {
 		case job := <-rc.retryCh:
 			rc.process(job)
 		case <-rc.ctx.Done():
-			// Drain remaining jobs — counters were already zeroed by ResetStatus/Stop.
 			for {
 				select {
 				case <-rc.retryCh:
@@ -192,7 +188,6 @@ func (rc *RetryCoordinator) loop() {
 // process handles a single retryJob: checks staleness/cancellation, waits, then
 // re-submits to the pipeline.
 func (rc *RetryCoordinator) process(job retryJob) {
-	// Generation check (REQ-025, REQ-026).
 	if rc.pipeline.generation.Load() != job.generation {
 		rc.decPending()
 		return
@@ -205,21 +200,19 @@ func (rc *RetryCoordinator) process(job retryJob) {
 	currentStamp := rc.pathStamps[job.path]
 	rc.pathMu.Unlock()
 	if currentStamp != job.pathStamp {
-		// Counters already decremented by SubmitFile — only decrement pendingCount.
 		rc.pendingCount.Add(-1)
 		return
 	}
 
-	// Wait based on error classification.
 	cls := apperr.Classify(apperr.New(job.code, job.message))
-	backoffIdx := job.attempts - 2 // attempt=2 → backoffs[0], attempt=3 → backoffs[1]
+	backoffIdx := job.attempts - 2
 	if backoffIdx < 0 {
 		backoffIdx = 0
 	}
 
 	switch cls {
 	case apperr.ClassTransientRetry:
-		backoff := rc.backoffs[len(rc.backoffs)-1] // cap at max
+		backoff := rc.backoffs[len(rc.backoffs)-1]
 		if backoffIdx < len(rc.backoffs) {
 			backoff = rc.backoffs[backoffIdx]
 		}
@@ -237,7 +230,6 @@ func (rc *RetryCoordinator) process(job retryJob) {
 		}
 	}
 
-	// Re-check generation and stamp after wake.
 	if rc.pipeline.generation.Load() != job.generation {
 		rc.decPending()
 		return
@@ -246,11 +238,10 @@ func (rc *RetryCoordinator) process(job retryJob) {
 	currentStamp = rc.pathStamps[job.path]
 	rc.pathMu.Unlock()
 	if currentStamp != job.pathStamp {
-		rc.pendingCount.Add(-1) // SubmitFile already decremented the pipeline counter
+		rc.pendingCount.Add(-1)
 		return
 	}
 
-	// Clear path stamp now that this job is being dispatched.
 	rc.pathMu.Lock()
 	if rc.pathStamps[job.path] == job.pathStamp {
 		delete(rc.pathStamps, job.path)
@@ -261,7 +252,6 @@ func (rc *RetryCoordinator) process(job retryJob) {
 	// Indexed+Failed+Pending ≤ Total holds at every snapshot (REQ-031).
 	rc.decPending()
 
-	// Re-submit to pipeline as a single-file job with the accumulated attempts.
 	rc.pipeline.pendingJobs.Add(1)
 	select {
 	case rc.pipeline.jobCh <- indexJob{

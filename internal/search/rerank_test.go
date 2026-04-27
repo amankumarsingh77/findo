@@ -62,7 +62,6 @@ func TestRerank_RecencyMultiplier(t *testing.T) {
 		},
 	}
 
-	// Must clause: modified_at >= 2 days ago (file is within range)
 	spec := query.FilterSpec{
 		Must: []query.Clause{
 			{
@@ -79,7 +78,6 @@ func TestRerank_RecencyMultiplier(t *testing.T) {
 		t.Fatalf("expected 1 result, got %d", len(ranked))
 	}
 
-	// cos_sim=0.8, no should boost, recency_mult=1.2 → 0.8 * 1.2 = 0.96
 	const want = float32(0.96)
 	const epsilon = float32(0.001)
 	got := ranked[0].FinalScore
@@ -101,7 +99,6 @@ func TestRerank_NoRecencyOnPureSemantic(t *testing.T) {
 		},
 	}
 
-	// No date Must clause — pure semantic
 	spec := query.FilterSpec{}
 
 	ranked := Rerank(results, spec)
@@ -110,7 +107,6 @@ func TestRerank_NoRecencyOnPureSemantic(t *testing.T) {
 		t.Fatalf("expected 1 result, got %d", len(ranked))
 	}
 
-	// cos_sim=0.8, no boosts → 0.8
 	const want = float32(0.8)
 	const epsilon = float32(0.001)
 	got := ranked[0].FinalScore
@@ -147,7 +143,6 @@ func TestRerank_SortsDescending(t *testing.T) {
 		t.Fatalf("expected 3 results, got %d", len(ranked))
 	}
 
-	// Verify descending order
 	for i := 0; i < len(ranked)-1; i++ {
 		if ranked[i].FinalScore < ranked[i+1].FinalScore {
 			t.Errorf("results not sorted descending at index %d: %v < %v",
@@ -155,7 +150,6 @@ func TestRerank_SortsDescending(t *testing.T) {
 		}
 	}
 
-	// Verify the top result is the closest
 	if ranked[0].File.Path != "/tmp/close.txt" {
 		t.Errorf("expected /tmp/close.txt as top result, got %s", ranked[0].File.Path)
 	}

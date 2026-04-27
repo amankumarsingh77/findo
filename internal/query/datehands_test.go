@@ -9,10 +9,6 @@ import (
 // 2026-04-24 15:30:00 UTC (a Friday, Q2)
 var testNow = time.Date(2026, 4, 24, 15, 30, 0, 0, time.UTC)
 
-// -----------------------------------------------------------------------
-// TestHandRulesExistingPhrases — existing phrases must match old behavior.
-// -----------------------------------------------------------------------
-
 func TestHandRulesExistingPhrases(t *testing.T) {
 	h := handRulesParser{}
 
@@ -25,7 +21,6 @@ func TestHandRulesExistingPhrases(t *testing.T) {
 		if !after.Equal(wantAfter) {
 			t.Errorf("after: got %v, want %v", after, wantAfter)
 		}
-		// before should equal now
 		if !before.Equal(testNow) {
 			t.Errorf("before: got %v, want %v (now)", before, testNow)
 		}
@@ -90,10 +85,6 @@ func TestHandRulesExistingPhrases(t *testing.T) {
 	})
 }
 
-// -----------------------------------------------------------------------
-// TestHandRulesThisMorning / Afternoon / Evening
-// -----------------------------------------------------------------------
-
 func TestHandRulesThisMorning(t *testing.T) {
 	h := handRulesParser{}
 	after, before, ok := h.Parse("this morning", testNow)
@@ -142,10 +133,6 @@ func TestHandRulesThisEvening(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// TestHandRulesPastCoupleOfMonths / PastFewMonths
-// -----------------------------------------------------------------------
-
 func TestHandRulesPastCoupleOfMonths(t *testing.T) {
 	h := handRulesParser{}
 
@@ -182,10 +169,6 @@ func TestHandRulesPastFewMonths(t *testing.T) {
 		t.Errorf("before: got %v, want now %v", before, testNow)
 	}
 }
-
-// -----------------------------------------------------------------------
-// TestHandRulesLastQuarter / EndOfLastQuarter
-// -----------------------------------------------------------------------
 
 func TestHandRulesLastQuarter(t *testing.T) {
 	h := handRulesParser{}
@@ -240,10 +223,6 @@ func TestHandRulesEndOfLastQuarter(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// TestHandRulesPastN — regex-driven past N units
-// -----------------------------------------------------------------------
-
 func TestHandRulesPastN(t *testing.T) {
 	h := handRulesParser{}
 
@@ -273,10 +252,6 @@ func TestHandRulesPastN(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// TestHandRulesYearOnly
-// -----------------------------------------------------------------------
-
 func TestHandRulesYearOnly(t *testing.T) {
 	h := handRulesParser{}
 	after, before, ok := h.Parse("2025", testNow)
@@ -292,10 +267,6 @@ func TestHandRulesYearOnly(t *testing.T) {
 		t.Errorf("before: got %v, want %v", before, wantBefore)
 	}
 }
-
-// -----------------------------------------------------------------------
-// TestHandRulesNoMatch
-// -----------------------------------------------------------------------
 
 func TestHandRulesNoMatch(t *testing.T) {
 	h := handRulesParser{}

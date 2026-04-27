@@ -5,10 +5,6 @@ import (
 	"strings"
 )
 
-// ---------------------------------------------------------------------------
-// Scorer — computes per-case and aggregate scores.
-// ---------------------------------------------------------------------------
-
 // scoreCase returns a float in [0,1] representing how well got matches want.
 func scoreCase(got FilterSpec, want goldenExpected) float64 {
 	total := 0.0
@@ -151,10 +147,6 @@ func clausesForField2(want goldenExpected, field FieldEnum) []goldenClause {
 	return out
 }
 
-// ---------------------------------------------------------------------------
-// Value conversion utilities
-// ---------------------------------------------------------------------------
-
 func toInt64(v any) (int64, bool) {
 	switch x := v.(type) {
 	case int64:
@@ -210,10 +202,6 @@ func stringSetEqual(a, b []string) bool {
 	}
 	return true
 }
-
-// ---------------------------------------------------------------------------
-// Aggregation helpers
-// ---------------------------------------------------------------------------
 
 // topNWorst returns at most n caseScores sorted by score ascending.
 func topNWorst(scores []caseScore, n int) []caseScore {

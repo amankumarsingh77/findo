@@ -50,7 +50,6 @@ func TestReconcileIndex_AllVectorsPresent(t *testing.T) {
 		t.Fatalf("UpsertFile: %v", err)
 	}
 
-	// Insert 2 chunks and add their vectors to HNSW.
 	vecID1 := "f1-c0"
 	vecID2 := "f1-c1"
 	if _, err := s.InsertChunk(store.ChunkRecord{FileID: fileID, VectorID: vecID1, ChunkIndex: 0}); err != nil {
@@ -60,7 +59,6 @@ func TestReconcileIndex_AllVectorsPresent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Add vectors to HNSW index so they're present.
 	vec := make([]float32, 768)
 	for i := range vec {
 		vec[i] = 0.1
@@ -108,7 +106,6 @@ func TestReconcileIndex_MissingVectors(t *testing.T) {
 		t.Fatalf("UpsertFile: %v", err)
 	}
 
-	// Insert chunks but do NOT add vectors to HNSW.
 	if _, err := s.InsertChunk(store.ChunkRecord{FileID: fileID, VectorID: "f1-c0", ChunkIndex: 0}); err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +149,6 @@ func TestReconcileIndex_PartialVectors(t *testing.T) {
 		t.Fatalf("UpsertFile: %v", err)
 	}
 
-	// Insert 3 chunks.
 	vecIDs := []string{"f1-c0", "f1-c1", "f1-c2"}
 	for i, vid := range vecIDs {
 		if _, err := s.InsertChunk(store.ChunkRecord{FileID: fileID, VectorID: vid, ChunkIndex: i}); err != nil {
@@ -160,7 +156,6 @@ func TestReconcileIndex_PartialVectors(t *testing.T) {
 		}
 	}
 
-	// Add only 2 of 3 vectors to HNSW.
 	vec := make([]float32, 768)
 	for i := range vec {
 		vec[i] = 0.1
@@ -171,7 +166,6 @@ func TestReconcileIndex_PartialVectors(t *testing.T) {
 	if err := idx.Add(vecIDs[1], vec); err != nil {
 		t.Fatalf("idx.Add: %v", err)
 	}
-	// vecIDs[2] is NOT added → missing.
 
 	p.ReconcileIndex()
 
@@ -189,7 +183,6 @@ func TestReconcileIndex_PartialVectors(t *testing.T) {
 func TestStartupRescan_SkipsNonExistentFolder(t *testing.T) {
 	p, _, _ := newTestPipeline(t, nil)
 
-	// Should not panic.
 	p.StartupRescan([]string{"/nonexistent/path/12345xyz"})
 
 	p.mu.RLock()
@@ -212,7 +205,6 @@ func TestStartupRescan_QueueModifiedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Store with old ModifiedAt (1 hour ago) — different from actual file mtime.
 	_, err := s.UpsertFile(store.FileRecord{
 		Path:        filePath,
 		FileType:    "text",
@@ -253,13 +245,11 @@ func TestStartupRescan_SkipsUnchangedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Get the actual mtime from disk.
 	info, err := os.Stat(filePath)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Store with the real mtime — no change detected.
 	_, err = s.UpsertFile(store.FileRecord{
 		Path:        filePath,
 		FileType:    "text",
@@ -273,7 +263,6 @@ func TestStartupRescan_SkipsUnchangedFile(t *testing.T) {
 		t.Fatalf("UpsertFile: %v", err)
 	}
 
-	// Drain any initial jobs (shouldn't be any, but just in case).
 	for len(p.jobCh) > 0 {
 		<-p.jobCh
 	}
@@ -295,7 +284,6 @@ func TestStartupRescan_SkipsUnchangedFile(t *testing.T) {
 func TestStartupRescan_CleanupDeletedFile(t *testing.T) {
 	p, s, idx := newTestPipeline(t, nil)
 
-	// Use a path that definitely doesn't exist on disk.
 	ghostPath := "/tmp/nonexistent_test_file_reconcile_xyz_12345.txt"
 
 	fileID, err := s.UpsertFile(store.FileRecord{
@@ -316,7 +304,6 @@ func TestStartupRescan_CleanupDeletedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Add vector to HNSW.
 	vec := make([]float32, 768)
 	for i := range vec {
 		vec[i] = 0.2
@@ -325,21 +312,17 @@ func TestStartupRescan_CleanupDeletedFile(t *testing.T) {
 		t.Fatalf("idx.Add: %v", err)
 	}
 
-	// Verify vector is in HNSW before cleanup.
 	if !idx.Has(vecID) {
 		t.Fatal("vector should be present in HNSW before cleanup")
 	}
 
-	// Call cleanupDeletedFiles directly (same package).
 	log := testLogger().WithGroup("test")
 	p.cleanupDeletedFiles(log)
 
-	// Verify file is removed from SQLite.
 	if _, err := s.GetFileByPath(ghostPath); err == nil {
 		t.Fatal("expected file to be removed from SQLite, but it still exists")
 	}
 
-	// Verify vector is removed from HNSW.
 	if idx.Has(vecID) {
 		t.Fatal("expected vector to be removed from HNSW after file cleanup")
 	}
@@ -350,7 +333,6 @@ func TestStartupRescan_CleanupDeletedFile(t *testing.T) {
 func TestStartupRescan_SkipsExcludedDirs(t *testing.T) {
 	p, s, _ := newTestPipeline(t, nil)
 
-	// Create a temp dir with a node_modules subdir containing a .txt file.
 	dir := t.TempDir()
 	excludedDir := filepath.Join(dir, "node_modules")
 	if err := os.MkdirAll(excludedDir, 0o755); err != nil {
@@ -361,12 +343,10 @@ func TestStartupRescan_SkipsExcludedDirs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Add the excluded pattern to the store.
 	if err := s.AddExcludedPattern("node_modules"); err != nil {
 		t.Fatalf("AddExcludedPattern: %v", err)
 	}
 
-	// Drain any existing jobs.
 	for len(p.jobCh) > 0 {
 		<-p.jobCh
 	}

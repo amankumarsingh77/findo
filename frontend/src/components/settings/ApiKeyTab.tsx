@@ -146,8 +146,6 @@ function StatusCard({ stats }: StatusCardProps) {
   );
 }
 
-// relativeTime formats a unix-seconds timestamp as a short relative string.
-// Returns null when the timestamp is the zero/never value.
 function relativeTime(unix: number): string | null {
   if (!unix) return null;
   const diff = Math.max(0, Math.floor(Date.now() / 1000) - unix);

@@ -1,5 +1,4 @@
-// Package query provides natural-language query parsing, classification, and
-// caching utilities for the Universal Search pipeline.
+// Package query provides natural-language query parsing, classification, and caching utilities.
 package query
 
 import (
@@ -68,14 +67,12 @@ var stopwords = map[string]struct{}{
 func Classify(raw string) (kind QueryKind, stripped string) {
 	q := strings.TrimSpace(raw)
 
-	// Rule 1: explicit "f:" prefix (case-insensitive).
 	lower := strings.ToLower(q)
 	if strings.HasPrefix(lower, "f:") {
 		remainder := q[2:] // strip "f:" (always 2 bytes)
 		return KindFilename, remainder
 	}
 
-	// Rule 2: glob characters.
 	if strings.ContainsAny(q, "*?") {
 		return KindFilename, q
 	}
@@ -92,18 +89,15 @@ func Classify(raw string) (kind QueryKind, stripped string) {
 	if wordCount == 1 {
 		token := words[0]
 
-		// Rule 3: has a file extension suffix.
 		if reExtension.MatchString(token) {
 			return KindFilename, q
 		}
 
-		// Rule 4: looks like a code identifier and is short enough.
 		if len(token) <= 30 && reIdentifier.MatchString(token) {
 			return KindHybrid, q
 		}
 	}
 
-	// Rule 5: contains a stopword and has ≥ 2 words.
 	if wordCount >= 2 {
 		for _, w := range words {
 			if _, ok := stopwords[strings.ToLower(w)]; ok {
@@ -112,11 +106,9 @@ func Classify(raw string) (kind QueryKind, stripped string) {
 		}
 	}
 
-	// Rule 6: ≥ 4 words (no stopword found at this point).
 	if wordCount >= 4 {
 		return KindContent, q
 	}
 
-	// Rule 7: default.
 	return KindHybrid, q
 }

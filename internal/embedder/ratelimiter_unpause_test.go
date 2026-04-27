@@ -36,11 +36,9 @@ func TestWaitForUnpause_WakeOnDeadlineReached(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	// Should wake promptly after the 200ms deadline — allow up to 250ms total.
 	if elapsed > 250*time.Millisecond {
 		t.Fatalf("expected wake within 250ms, took %v", elapsed)
 	}
-	// Should not have woken up absurdly early.
 	if elapsed < 150*time.Millisecond {
 		t.Fatalf("woke too early (%v), pause was 200ms", elapsed)
 	}
@@ -50,7 +48,6 @@ func TestWaitForUnpause_WakeOnDeadlineReached(t *testing.T) {
 // within 50 ms of PauseUntil being called with a past timestamp (REQ-021a).
 func TestWaitForUnpause_WakeOnExplicitClear(t *testing.T) {
 	rl := NewRateLimiter(10, time.Minute)
-	// Set a 2-second pause.
 	rl.PauseUntil(time.Now().Add(2 * time.Second))
 
 	done := make(chan error, 1)
@@ -58,12 +55,10 @@ func TestWaitForUnpause_WakeOnExplicitClear(t *testing.T) {
 		done <- rl.WaitForUnpause(context.Background())
 	}()
 
-	// After 50 ms, explicitly clear by calling PauseUntil with a past time.
 	time.Sleep(50 * time.Millisecond)
 	clearTime := time.Now()
-	rl.PauseUntil(time.Now().Add(-time.Second)) // past timestamp — explicit clear
+	rl.PauseUntil(time.Now().Add(-time.Second))
 
-	// Waiter should wake within 50 ms of the clear call.
 	select {
 	case err := <-done:
 		if err != nil {
@@ -83,7 +78,6 @@ func TestWaitForUnpause_WakeOnExplicitClear(t *testing.T) {
 // it stays blocked until the new (longer) deadline (REQ-021a).
 func TestWaitForUnpause_ExtensionDoesNotWakeEarly(t *testing.T) {
 	rl := NewRateLimiter(10, time.Minute)
-	// First pause: 150ms.
 	rl.PauseUntil(time.Now().Add(150 * time.Millisecond))
 
 	done := make(chan struct{}, 1)
@@ -94,24 +88,19 @@ func TestWaitForUnpause_ExtensionDoesNotWakeEarly(t *testing.T) {
 		done <- struct{}{}
 	}()
 
-	// After 50ms, extend the pause to 500ms total from now.
 	time.Sleep(50 * time.Millisecond)
 	extendedDeadline := time.Now().Add(400 * time.Millisecond)
 	rl.PauseUntil(extendedDeadline)
 
-	// The goroutine must NOT wake at the original ~150ms mark.
-	time.Sleep(150 * time.Millisecond) // original deadline has passed
+	time.Sleep(150 * time.Millisecond)
 	select {
 	case <-done:
-		// Woke too early — before extended deadline.
 		if wakeTime.Before(extendedDeadline.Add(-50 * time.Millisecond)) {
 			t.Fatalf("waiter woke at %v, before extended deadline %v", wakeTime, extendedDeadline)
 		}
 	default:
-		// Still blocked — correct behavior; wait for it to eventually finish.
 	}
 
-	// Now wait for it to finish after the extended deadline.
 	select {
 	case <-done:
 		if wakeTime.Before(extendedDeadline.Add(-60 * time.Millisecond)) {
@@ -126,7 +115,6 @@ func TestWaitForUnpause_ExtensionDoesNotWakeEarly(t *testing.T) {
 // ctx.Err() promptly on context cancellation (REQ-021a).
 func TestWaitForUnpause_CtxCancellation(t *testing.T) {
 	rl := NewRateLimiter(10, time.Minute)
-	// Set a long pause.
 	rl.PauseUntil(time.Now().Add(10 * time.Second))
 
 	ctx, cancel := context.WithCancel(context.Background())

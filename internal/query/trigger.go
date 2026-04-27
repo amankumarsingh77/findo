@@ -46,7 +46,6 @@ func (t Trigger) ShouldInvokeLLM(residual string) bool {
 	if fileTypeRe.MatchString(lower) {
 		return true
 	}
-	// Token count > minTokens.
 	tokens := strings.Fields(residual)
 	if len(tokens) > minTokens {
 		return true

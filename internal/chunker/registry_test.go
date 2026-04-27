@@ -86,7 +86,6 @@ func TestMimeType(t *testing.T) {
 }
 
 func TestChunkFile_HEICTranscodes(t *testing.T) {
-	// Inject a stub transcoder so the test runs without a real HEIC file.
 	fakeJPEG := []byte{0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10} // JPEG magic bytes
 	reg := NewRegistry().WithHEICTranscoder(func(_ string) ([]byte, error) {
 		return fakeJPEG, nil
@@ -155,10 +154,6 @@ func TestChunkFile_HEICOversizedSkipsTranscode(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Phase 4: apperr code assertions for chunker failure sites — REQ-003
-// ---------------------------------------------------------------------------
-
 // TestChunkBinary_FileTooLarge_IsWrapped — EDGE-018, REQ-003
 // ChunkBinary on a file exceeding maxBinarySize must return ERR_FILE_TOO_LARGE.
 func TestChunkBinary_FileTooLarge_IsWrapped(t *testing.T) {
@@ -186,7 +181,6 @@ func TestChunkBinary_FileTooLarge_IsWrapped(t *testing.T) {
 	if appErr.Code != apperr.ErrFileTooLarge.Code {
 		t.Errorf("appErr.Code = %q, want %q", appErr.Code, apperr.ErrFileTooLarge.Code)
 	}
-	// errors.Is must also work via the Is() method.
 	if !errors.Is(err, apperr.ErrFileTooLarge) {
 		t.Error("errors.Is(err, apperr.ErrFileTooLarge) should be true")
 	}
@@ -244,7 +238,6 @@ func TestChunkFile_HEIC_ExtractionFailed_IsWrapped(t *testing.T) {
 	if appErr.Code != apperr.ErrExtractionFailed.Code {
 		t.Errorf("appErr.Code = %q, want %q", appErr.Code, apperr.ErrExtractionFailed.Code)
 	}
-	// Cause must still be reachable via errors.Is.
 	if !errors.Is(err, transcoderErr) {
 		t.Error("errors.Is(err, transcoderErr) should be true via unwrap chain")
 	}
@@ -307,7 +300,6 @@ func TestChunkDocument_LibreOfficeMissing_IsExtractionFailed(t *testing.T) {
 	if appErr.Code != apperr.ErrExtractionFailed.Code {
 		t.Errorf("appErr.Code = %q, want %q", appErr.Code, apperr.ErrExtractionFailed.Code)
 	}
-	// Must be Permanent classification (EDGE-017).
 	if c := apperr.Classify(err); c != apperr.ClassPermanent {
 		t.Errorf("Classify = %q, want ClassPermanent", c)
 	}

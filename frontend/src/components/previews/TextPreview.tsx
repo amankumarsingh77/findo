@@ -19,7 +19,6 @@ export function TextPreview({ filePath }: Props) {
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes('binary')) setIsBinary(true);
-        // other errors: show nothing (content stays null)
       })
       .finally(() => setLoading(false));
   }, [filePath]);

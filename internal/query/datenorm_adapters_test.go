@@ -5,10 +5,6 @@ import (
 	"time"
 )
 
-// -----------------------------------------------------------------------
-// TestAnytimeDefaultToPast
-// -----------------------------------------------------------------------
-
 func TestAnytimeDefaultToPast(t *testing.T) {
 	// "december" at now=2026-04-24 should resolve to December 2025 (past).
 	p := anytimeParser{}
@@ -59,10 +55,6 @@ func TestAnytimeNoMatch(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// TestDateParserFallback
-// -----------------------------------------------------------------------
-
 func TestDateParserFallback(t *testing.T) {
 	// "12 August 2021" — an absolute date go-anytime might not handle well
 	// but go-dateparser should parse.
@@ -104,12 +96,7 @@ func TestDateParserNoMatch(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// TestChainOrder — hand-rules tried first, then anytime, then dateparser
-// -----------------------------------------------------------------------
-
 func TestChainOrder(t *testing.T) {
-	// Replace dateChain with a trace-recording chain.
 	var callOrder []string
 
 	type tracingParser struct {
@@ -130,7 +117,6 @@ func TestChainOrder(t *testing.T) {
 	original := dateChain
 	defer func() { dateChain = original }()
 
-	// Set chain: first returns false, second returns true.
 	dateChain = []dateParser{
 		makeTracer("first", false),
 		makeTracer("second", true),
@@ -152,7 +138,6 @@ func TestChainOrder(t *testing.T) {
 	if callOrder[1] != "second" {
 		t.Errorf("second parser called should be 'second', got %q", callOrder[1])
 	}
-	// "third" should NOT be called since "second" returned ok=true.
 	for _, name := range callOrder {
 		if name == "third" {
 			t.Error("third parser should not be called after second succeeds")
@@ -174,10 +159,6 @@ func (tp *tracingParserImpl) Parse(s string, now time.Time) (after, before time.
 	}
 	return
 }
-
-// -----------------------------------------------------------------------
-// TestNormalizeDateEmpty
-// -----------------------------------------------------------------------
 
 func TestNormalizeDateEmpty(t *testing.T) {
 	now := time.Now()

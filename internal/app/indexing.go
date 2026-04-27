@@ -16,7 +16,6 @@ func (a *App) GetIndexStatus() IndexStatusDTO {
 	}
 	s := a.pipeline.Status()
 
-	// Build top-5 failure groups from the registry (already sorted desc by count).
 	rawGroups := a.pipeline.Registry().Groups()
 	const maxGroups = 5
 	if len(rawGroups) > maxGroups {
@@ -150,8 +149,6 @@ func (a *App) GetDebugStats() map[string]any {
 	}
 }
 
-// watchEvents processes file watcher events and queues single-file indexing.
-// Exits when ctx is cancelled or the events channel is closed.
 func (a *App) watchEvents(ctx context.Context, events <-chan watcher.FileEvent) {
 	runtime.ResetSignalHandlers()
 	for {
@@ -176,8 +173,6 @@ func (a *App) watchEvents(ctx context.Context, events <-chan watcher.FileEvent) 
 	}
 }
 
-// emitStatusLoop sends indexing status updates to the frontend every second.
-// Exits when ctx is cancelled.
 func (a *App) emitStatusLoop(ctx context.Context) {
 	runtime.ResetSignalHandlers()
 	ticker := time.NewTicker(1 * time.Second)

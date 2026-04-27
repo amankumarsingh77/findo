@@ -8,7 +8,7 @@ export interface SearchState {
   raw: string
   chips: ChipDTO[]
   semanticQuery: string
-  chipDenyList: string[]  // clauseKey strings
+  chipDenyList: string[]
   phase: SearchPhase
   banner: string | null
 }

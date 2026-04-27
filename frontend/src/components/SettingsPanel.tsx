@@ -65,7 +65,6 @@ export function SettingsPanel({
 
   return (
     <div style={styles.overlay}>
-      {/* Header */}
       <div style={styles.header}>
         <button style={styles.backBtn} onClick={onClose} title="Back">
           <ArrowLeft size={18} />
@@ -77,7 +76,6 @@ export function SettingsPanel({
       </div>
 
       <div style={styles.body}>
-        {/* Left rail */}
         <nav style={styles.rail}>
           {NAV_ITEMS.map((item) => (
             <button
@@ -97,7 +95,6 @@ export function SettingsPanel({
           ))}
         </nav>
 
-        {/* Content pane */}
         <div style={styles.content}>
           {activeTab === 'folders' && <FoldersTab />}
           {activeTab === 'api-key' && (

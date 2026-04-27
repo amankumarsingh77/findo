@@ -67,10 +67,6 @@ func (c *ParsedQueryCache) Set(query string, spec FilterSpec) error {
 	return c.store.UpsertParsedQueryCache(key, string(data), CacheSchemaVersion)
 }
 
-// ---------------------------------------------------------------------------
-// Custom JSON marshaling for FilterSpec (handles Value any)
-// ---------------------------------------------------------------------------
-
 // taggedValue is used to encode the type of the Value field in a Clause.
 type taggedValue struct {
 	Type  string `json:"t"`

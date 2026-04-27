@@ -1,12 +1,11 @@
 import { useState } from 'react';
 
 interface ThumbnailProps {
-  fileType: string;      // "image" | "video" | "audio" | "code" | "text" | "document" | other
-  thumbnailPath?: string; // absolute disk path; only meaningful when fileType === "image"
-  size?: number;          // default 32
+  fileType: string;
+  thumbnailPath?: string;
+  size?: number;
 }
 
-// Colors from ResultItem.tsx:68-73 palette
 const TYPE_COLORS: Record<string, string> = {
   video: '#06B6D4',
   image: '#F97316',
@@ -20,18 +19,15 @@ function getTypeColor(fileType: string): string {
   return TYPE_COLORS[fileType] ?? 'rgba(255,255,255,0.3)';
 }
 
-// Stroke-based SVG icons keyed by file type
 const TYPE_ICONS: Record<string, (size: number, color: string) => JSX.Element> = {
   image: (size, color) => {
     const p = size * 0.18;
     const w = size - p * 2;
     const h = size - p * 2;
     const r = size * 0.09;
-    // Frame with mountain/sun outline
     const sunCx = p + w * 0.3;
     const sunCy = p + h * 0.35;
     const sunR = w * 0.12;
-    // Mountain path: left peak and right peak inside frame
     const mLeft = p + w * 0.08;
     const mRight = p + w * 0.92;
     const mBottom = p + h * 0.8;
@@ -58,7 +54,6 @@ const TYPE_ICONS: Record<string, (size: number, color: string) => JSX.Element> =
     const w = size - p * 2;
     const h = size - p * 2;
     const r = size * 0.18;
-    // Play triangle inside rounded rect
     const tx = p + w * 0.38;
     const ty = p + h * 0.28;
     const tbx = p + w * 0.38;
@@ -81,7 +76,6 @@ const TYPE_ICONS: Record<string, (size: number, color: string) => JSX.Element> =
   },
 
   audio: (size, color) => {
-    // Simple waveform: 5 vertical bars of varying height
     const barW = size * 0.08;
     const gap = size * 0.055;
     const totalW = 5 * barW + 4 * gap;
@@ -111,17 +105,13 @@ const TYPE_ICONS: Record<string, (size: number, color: string) => JSX.Element> =
   },
 
   code: (size, color) => {
-    // </> as paths: left chevron (<), slash (/), right chevron (>)
     const sw = size * 0.065;
     const cy = size / 2;
-    // Left chevron <
     const lx1 = size * 0.38; const ly1 = size * 0.28;
     const lx2 = size * 0.22; const ly2 = cy;
     const lx3 = size * 0.38; const ly3 = size * 0.72;
-    // Slash /
     const sx1 = size * 0.57; const sy1 = size * 0.25;
     const sx2 = size * 0.43; const sy2 = size * 0.75;
-    // Right chevron >
     const rx1 = size * 0.62; const ry1 = size * 0.28;
     const rx2 = size * 0.78; const ry2 = cy;
     const rx3 = size * 0.62; const ry3 = size * 0.72;
@@ -135,7 +125,6 @@ const TYPE_ICONS: Record<string, (size: number, color: string) => JSX.Element> =
   },
 
   text: (size, color) => {
-    // Three horizontal lines (file-lines glyph)
     const sw = size * 0.065;
     const lx1 = size * 0.22;
     const lx2 = size * 0.78;
@@ -152,7 +141,6 @@ const TYPE_ICONS: Record<string, (size: number, color: string) => JSX.Element> =
   },
 };
 
-// Classic file-with-folded-corner outline
 function FileIcon(size: number, color: string, opacity = 1): JSX.Element {
   const sw = size * 0.065;
   const pl = size * 0.2;
@@ -160,7 +148,6 @@ function FileIcon(size: number, color: string, opacity = 1): JSX.Element {
   const pt = size * 0.1;
   const pb = size * 0.9;
   const fold = size * 0.25;
-  // Main outline with top-right fold
   const d = [
     `M ${pl} ${pt}`,
     `L ${pr - fold} ${pt}`,
@@ -169,7 +156,6 @@ function FileIcon(size: number, color: string, opacity = 1): JSX.Element {
     `L ${pl} ${pb}`,
     `Z`,
   ].join(' ');
-  // Fold crease
   const fc = [
     `M ${pr - fold} ${pt}`,
     `L ${pr - fold} ${pt + fold}`,

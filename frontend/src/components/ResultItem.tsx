@@ -29,7 +29,7 @@ function getTypeColor(fileType: string): string {
 
 function getShortDir(filePath: string): string {
   const parts = filePath.split('/');
-  parts.pop(); // remove filename
+  parts.pop();
   if (parts.length === 0) return '';
   return parts.slice(-2).join('/');
 }

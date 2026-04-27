@@ -120,11 +120,9 @@ func TestApplyPersistedIndexingOverrides_IgnoresInvalidValues(t *testing.T) {
 
 func TestSetIndexingSettings_NoPartialPersistOnInvalid(t *testing.T) {
 	a := newTestApp(t)
-	// Seed valid values.
 	if err := a.SetIndexingSettings(4, 60); err != nil {
 		t.Fatal(err)
 	}
-	// Attempt with invalid rate limit; workers value (5) must NOT be persisted.
 	_ = a.SetIndexingSettings(5, 99999)
 	w, _ := a.store.GetSetting("indexing.workers", "")
 	if w != "4" {

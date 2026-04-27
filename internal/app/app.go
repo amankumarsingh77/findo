@@ -30,8 +30,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// envAPIKey returns the Gemini API key from standard env vars. Kept as a
-// small helper so the startup wiring reads clean.
 func envAPIKey() string {
 	if k := os.Getenv("GEMINI_API_KEY"); k != "" {
 		return k
@@ -68,14 +66,11 @@ type App struct {
 	saveTimerMu sync.Mutex
 	saveTimer   *time.Timer
 
-	// NL query understanding (Phase 6)
 	parsedQueryCache parsedQueryCacheIface
 	llmParser        llmQueryParser
 
-	// Observability (Phase 8)
 	queryStats *QueryStats
 
-	// Graceful shutdown (Phase 8)
 	baseCtx        context.Context
 	shutdownCancel context.CancelFunc
 	group          *errgroup.Group
@@ -86,8 +81,6 @@ type App struct {
 	backendErrorSink func(payload map[string]any)
 }
 
-// deriveErrorCodeAndMessage inspects err for an apperr.Error and returns its
-// code + message. Falls back to ERR_INTERNAL for bare errors.
 func deriveErrorCodeAndMessage(err error) (code, message string) {
 	var aerr *apperr.Error
 	if errors.As(err, &aerr) {
@@ -169,9 +162,6 @@ func OnStartup(a *App) func(context.Context) { return a.startup }
 // OnShutdown returns the Wails shutdown callback for the given app.
 func OnShutdown(a *App) func(context.Context) { return a.shutdown }
 
-// startup is called when the Wails app starts. It initialises all backend
-// components: store, vector index, embedder, search engine, indexing pipeline,
-// and file watcher.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.startErrgroup()
@@ -180,10 +170,8 @@ func (a *App) startup(ctx context.Context) {
 	// policy in its AppDelegate, so this must be set after startup.
 	desktop.SetAccessoryActivationPolicy()
 
-	// Initialize logger.
 	dataDir, err := platform.DataDir()
 	if err != nil {
-		// Fallback: logger to stderr only if data dir fails.
 		a.logger = slog.Default()
 		a.logger.Error("failed to resolve data directory", "error", err)
 		return
@@ -275,7 +263,6 @@ func (a *App) startup(ctx context.Context) {
 
 	a.engine = a.buildSearchEngine()
 
-	// Wire NL query understanding components.
 	a.parsedQueryCache = query.NewParsedQueryCache(a.store)
 	if g, ok := a.embedder.(*embedder.GeminiEmbedder); ok {
 		a.llmParser = query.NewLLMParserWithConfig(g.Client(), g.Limiter(), query.LLMConfig{
@@ -285,7 +272,6 @@ func (a *App) startup(ctx context.Context) {
 		})
 	}
 
-	// Check ffmpeg/ffprobe availability for video processing.
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
 		log.Warn("ffmpeg not found in PATH — video thumbnails and previews will not work")
 	}
@@ -300,7 +286,6 @@ func (a *App) startup(ctx context.Context) {
 		SaveEveryN:   a.cfg.Indexing.SaveEveryN,
 	})
 
-	// Start file watcher.
 	eventCh := make(chan watcher.FileEvent, 100)
 	a.watcher, err = watcher.New(eventCh, 500*time.Millisecond, a.logger)
 	if err != nil {
@@ -315,7 +300,6 @@ func (a *App) startup(ctx context.Context) {
 		log.Warn("global hotkey unavailable", "error", err)
 	}
 
-	// Crash-recovery passes — run in background, supervised by errgroup.
 	a.group.Go(func() error {
 		a.pipeline.ReconcileIndex()
 		return nil
@@ -330,7 +314,6 @@ func (a *App) startup(ctx context.Context) {
 		return nil
 	})
 
-	// Background goroutines.
 	a.group.Go(func() error { a.watchEvents(a.groupCtx, eventCh); return nil })
 	a.group.Go(func() error { a.startWatchingFolders(); return nil })
 	a.group.Go(func() error { a.emitStatusLoop(a.groupCtx); return nil })
@@ -381,7 +364,6 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.watcher != nil {
 		a.watcher.Close()
 	}
-	// Cancel any pending debounced save and write synchronously.
 	a.saveTimerMu.Lock()
 	if a.saveTimer != nil {
 		a.saveTimer.Stop()

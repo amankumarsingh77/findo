@@ -138,7 +138,6 @@ func TestVectorIndex_Has_BeforeSave(t *testing.T) {
 	vec[0] = 1.0
 	idx.Add("id-inmem", vec)
 
-	// No Save called — vector only exists in memory.
 	if !idx.Has("id-inmem") {
 		t.Fatal("Has should return true for in-memory vector not yet saved to disk")
 	}
@@ -158,7 +157,6 @@ func TestVectorIndex_Save_AtomicNoTmpFiles(t *testing.T) {
 		t.Fatalf("Save failed: %v", err)
 	}
 
-	// Final files must exist.
 	if _, err := os.Stat(path + ".graph"); os.IsNotExist(err) {
 		t.Fatal(".graph file must exist after Save")
 	}
@@ -166,7 +164,6 @@ func TestVectorIndex_Save_AtomicNoTmpFiles(t *testing.T) {
 		t.Fatal(".map file must exist after Save")
 	}
 
-	// Tmp files must NOT exist after Save completes.
 	if _, err := os.Stat(path + ".graph.tmp"); !os.IsNotExist(err) {
 		t.Fatal(".graph.tmp must not exist after Save completes")
 	}
@@ -180,11 +177,9 @@ func TestLoadIndex_CorruptGraph(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bad.hnsw")
 
-	// Write garbage to .graph file.
 	if err := os.WriteFile(path+".graph", []byte("not a valid graph"), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	// Write a minimal .map file.
 	if err := os.WriteFile(path+".map", []byte("0\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
@@ -200,7 +195,6 @@ func TestLoadIndex_MissingMap(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "nomap.hnsw")
 
-	// Create and save a valid index to get a proper .graph file.
 	idx := NewDefaultIndex(testLogger)
 	vec := make([]float32, 768)
 	vec[0] = 1.0
@@ -209,7 +203,6 @@ func TestLoadIndex_MissingMap(t *testing.T) {
 		t.Fatalf("Save failed: %v", err)
 	}
 
-	// Remove the .map file.
 	if err := os.Remove(path + ".map"); err != nil {
 		t.Fatalf("Remove: %v", err)
 	}
@@ -225,7 +218,6 @@ func TestLoadIndex_IgnoresTmpFiles(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "mixed.hnsw")
 
-	// Save a valid index.
 	idx := NewDefaultIndex(testLogger)
 	vec := make([]float32, 768)
 	vec[0] = 1.0
@@ -234,7 +226,6 @@ func TestLoadIndex_IgnoresTmpFiles(t *testing.T) {
 		t.Fatalf("Save failed: %v", err)
 	}
 
-	// Place stale/corrupt .tmp files alongside.
 	if err := os.WriteFile(path+".graph.tmp", []byte("stale garbage"), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
@@ -242,7 +233,6 @@ func TestLoadIndex_IgnoresTmpFiles(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	// LoadIndex should load the valid .graph/.map and succeed.
 	idx2, err := LoadIndex(path, testLogger)
 	if err != nil {
 		t.Fatalf("LoadIndex should succeed ignoring .tmp files: %v", err)
@@ -268,7 +258,6 @@ func TestVectorIndex_Add_ManyVectors_NoNeighborhoodError(t *testing.T) {
 	}
 }
 
-// Round-trip: Save then LoadIndex preserves all vector IDs.
 func TestVectorIndex_RoundTrip_AllIDs(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "roundtrip.hnsw")

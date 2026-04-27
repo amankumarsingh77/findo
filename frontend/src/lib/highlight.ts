@@ -1,6 +1,3 @@
-// highlight.ts — splits a filename string into matched/unmatched segments
-// given a list of highlight ranges.
-//
 // Assumption: backend byte offsets are produced from ASCII-dominant filenames,
 // and we treat them as JS string (UTF-16 code unit) indices. For filenames that
 // contain multibyte Unicode characters the highlight may be off — we degrade
@@ -16,11 +13,9 @@ export interface Segment {
   matched: boolean;
 }
 
-// mergeRanges merges overlapping/adjacent ranges and returns them sorted by start.
 function mergeRanges(ranges: HighlightRange[], textLen: number): HighlightRange[] {
   if (ranges.length === 0) return [];
 
-  // Clamp and filter degenerate ranges
   const clamped = ranges
     .map((r) => ({
       start: Math.max(0, Math.min(r.start, textLen)),
@@ -37,7 +32,6 @@ function mergeRanges(ranges: HighlightRange[], textLen: number): HighlightRange[
     const last = merged[merged.length - 1];
     const cur = clamped[i];
     if (cur.start <= last.end) {
-      // Overlapping or adjacent — extend
       last.end = Math.max(last.end, cur.end);
     } else {
       merged.push({ ...cur });

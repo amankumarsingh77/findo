@@ -16,17 +16,12 @@ import (
 	"findo/internal/vectorstore"
 )
 
-// ---------------------------------------------------------------------------
 // REQ-031 / REQ-032: TestIndexing_CountInvariantHolds
-//
 // Drives a pipeline with a scripted mix of outcomes (success, permanent failure,
 // transient retry → success, transient retry → exhaustion) and asserts that
 // at every observed status snapshot:
-//
 //	IndexedFiles + FailedFiles + PendingRetryFiles ≤ TotalFiles
-//
 // This is the key invariant that prevents phantom counts.
-// ---------------------------------------------------------------------------
 
 // scriptedEmbedder applies a per-file outcome script based on the file's path.
 // It uses a map keyed by base filename to decide whether to succeed, fail
@@ -34,7 +29,7 @@ import (
 // or fail transiently.
 type scriptedEmbedder struct {
 	mu       sync.Mutex
-	outcomes map[string][]bool // filename → ordered outcomes (true=success, false=fail transient)
+	outcomes map[string][]bool
 }
 
 func (s *scriptedEmbedder) ModelID() string        { return "scripted" }
@@ -45,7 +40,6 @@ func (s *scriptedEmbedder) EmbedQuery(_ context.Context, _ string) ([]float32, e
 	return []float32{0, 0, 0}, nil
 }
 func (s *scriptedEmbedder) EmbedBatch(_ context.Context, chunks []embedder.ChunkInput) ([][]float32, error) {
-	// Use the title (filename) to look up the outcome.
 	var title string
 	if len(chunks) > 0 {
 		title = chunks[0].Title
@@ -85,15 +79,10 @@ func TestIndexing_CountInvariantHolds(t *testing.T) {
 	t.Cleanup(func() { s.Close() })
 	idx := vectorstore.NewDefaultIndex(testLogger())
 
-	// Create files with different outcome scripts:
-	// - success.txt: succeeds immediately
-	// - transient_then_ok.txt: fails once (transient), then succeeds
-	// - exhausted.txt: always fails (will exhaust maxAttempts)
-	// - permanent_fail.txt: nonexistent → ERR_FILE_UNREADABLE (permanent)
 	type fileSetup struct {
 		name     string
 		content  string
-		outcomes []bool // outcomes for scripted embedder (true=ok, false=fail transient)
+		outcomes []bool
 		exists   bool
 	}
 
@@ -118,7 +107,7 @@ func TestIndexing_CountInvariantHolds(t *testing.T) {
 		files = append(files, fileSetup{
 			name:     fmt.Sprintf("transient_%d.txt", i),
 			content:  fmt.Sprintf("transient file %d content that is meaningful for indexing via embedder pipeline", i),
-			outcomes: []bool{false, true}, // fail once then succeed
+			outcomes: []bool{false, true},
 			exists:   true,
 		})
 	}
@@ -126,23 +115,20 @@ func TestIndexing_CountInvariantHolds(t *testing.T) {
 		files = append(files, fileSetup{
 			name:     fmt.Sprintf("exhausted_%d.txt", i),
 			content:  fmt.Sprintf("exhausted file %d content that is meaningful for indexing via embedder", i),
-			outcomes: []bool{false, false, false}, // always fail
+			outcomes: []bool{false, false, false},
 			exists:   true,
 		})
 	}
-	// Permanent failures: nonexistent files.
 	for i := 0; i < nPermanent; i++ {
 		files = append(files, fileSetup{
 			name:   fmt.Sprintf("permanent_%d.txt", i),
-			exists: false, // file won't exist → ERR_FILE_UNREADABLE (Permanent)
+			exists: false,
 		})
 	}
 
-	// Shuffle for realism.
 	rng := rand.New(rand.NewSource(42))
 	rng.Shuffle(len(files), func(i, j int) { files[i], files[j] = files[j], files[i] })
 
-	// Build outcome map and create real files.
 	outcomes := make(map[string][]bool)
 	var paths []string
 	for _, f := range files {
@@ -154,7 +140,6 @@ func TestIndexing_CountInvariantHolds(t *testing.T) {
 			paths = append(paths, fpath)
 			outcomes[f.name] = f.outcomes
 		} else {
-			// Nonexistent path → permanent failure at checkStale.
 			paths = append(paths, filepath.Join(dir, "nonexistent", f.name))
 		}
 	}
@@ -222,7 +207,6 @@ func TestIndexing_CountInvariantHolds(t *testing.T) {
 		}
 	}()
 
-	// Submit all files.
 	p.SetTotalFiles(len(paths))
 	for _, fp := range paths {
 		p.pendingJobs.Add(1)
@@ -251,13 +235,11 @@ func TestIndexing_CountInvariantHolds(t *testing.T) {
 		_ = st
 	}
 
-	// Signal snapshot goroutine to stop.
 	select {
 	case snapshotDone <- struct{}{}:
 	default:
 	}
 
-	// Final invariant check.
 	final := p.Status()
 	totalFinal := final.IndexedFiles + final.FailedFiles + final.PendingRetryFiles
 	if totalFinal > final.TotalFiles {

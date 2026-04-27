@@ -11,10 +11,7 @@ const SUGGESTED = [
 const DEFAULT_HOTKEY = 'cmd+shift+space';
 
 function parseHotkeyDisplay(raw: string): string[] {
-  // raw is already human-readable from GetHotkeyString e.g. "⌘⇧Space"
-  // We'll just return it as a single chip for simplicity, or try to split
   if (!raw) return ['⌘', '⇧', 'Space'];
-  // Split on known modifier symbols
   const chars: string[] = [];
   let remaining = raw;
   const modifiers = ['⌘', '⌃', '⌥', '⇧'];
@@ -110,7 +107,6 @@ export function HotkeyTab({ onError }: HotkeyTabProps = {}) {
       const hasNonMod = !['meta', 'control', 'shift', 'alt'].includes(e.key.toLowerCase());
       if (hasNonMod && combo.includes('+')) {
         setLiveCombo(combo);
-        // Auto-save after brief delay
         setTimeout(() => applyCombo(combo), 600);
       } else if (hasNonMod) {
         setLiveCombo(combo);

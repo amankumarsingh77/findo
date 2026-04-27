@@ -88,13 +88,11 @@ func CorrectKind(s string) (canonical string, ok bool) {
 // CorrectExtension returns the canonical extension for s (without dot),
 // tolerating Levenshtein-1 typos. Returns ("", false) if no match.
 func CorrectExtension(s string) (canonical string, ok bool) {
-	// Direct match.
 	for _, ext := range knownExtensions {
 		if s == ext {
 			return ext, true
 		}
 	}
-	// Levenshtein-1.
 	for _, ext := range knownExtensions {
 		if Levenshtein(s, ext) <= 1 {
 			return ext, true

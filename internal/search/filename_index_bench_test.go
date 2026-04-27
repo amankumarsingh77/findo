@@ -27,7 +27,6 @@ func BenchmarkFilenameIndex_Query100k(b *testing.B) {
 	}
 	defer s.Close()
 
-	// Seed 100 000 synthetic file paths.
 	exts := []string{".go", ".py", ".ts", ".md", ".txt", ".json", ".yaml", ".sh"}
 	const total = 100_000
 	for i := 0; i < total; i++ {

@@ -13,7 +13,6 @@ func TestClassify(t *testing.T) {
 		wantKind     QueryKind
 		wantStripped string
 	}{
-		// Rule 1: f: prefix (case-insensitive)
 		{
 			name:         "f:demo.py_returns_filename",
 			input:        "f:demo.py",
@@ -32,7 +31,6 @@ func TestClassify(t *testing.T) {
 			wantKind:     KindFilename,
 			wantStripped: "readme.md",
 		},
-		// Rule 1 edge: empty remainder after f: prefix (EDGE-1)
 		{
 			name:         "f:_empty_remainder_returns_filename_empty",
 			input:        "f:",
@@ -40,7 +38,6 @@ func TestClassify(t *testing.T) {
 			wantStripped: "",
 		},
 
-		// Rule 2: glob characters
 		{
 			name:         "star_dot_py_returns_filename",
 			input:        "*.py",
@@ -59,7 +56,6 @@ func TestClassify(t *testing.T) {
 			wantKind:     KindFilename,
 			wantStripped: "foo?bar",
 		},
-		// Rule 2 edge: bare star alone (EDGE-7)
 		{
 			name:         "bare_star_returns_filename",
 			input:        "*",
@@ -67,7 +63,6 @@ func TestClassify(t *testing.T) {
 			wantStripped: "*",
 		},
 
-		// Rule 3: single token with file extension
 		{
 			name:         "demo.py_returns_filename",
 			input:        "demo.py",
@@ -86,7 +81,6 @@ func TestClassify(t *testing.T) {
 			wantKind:     KindFilename,
 			wantStripped: "report.docx",
 		},
-		// Rule 3 edge: extension-only token (EDGE-8)
 		{
 			name:         "dot_py_extension_only_returns_filename",
 			input:        ".py",
@@ -94,7 +88,6 @@ func TestClassify(t *testing.T) {
 			wantStripped: ".py",
 		},
 
-		// Rule 4: single identifier token → hybrid
 		{
 			name:         "getUserById_returns_hybrid",
 			input:        "getUserById",
@@ -114,7 +107,6 @@ func TestClassify(t *testing.T) {
 			wantStripped: "helpers",
 		},
 
-		// Rule 5: stopword present + ≥2 words → content
 		{
 			name:         "the_report_about_q3_sales_returns_content",
 			input:        "the report about q3 sales",
@@ -134,7 +126,6 @@ func TestClassify(t *testing.T) {
 			wantStripped: "the report",
 		},
 
-		// Rule 6: ≥4 words, no stopword → content
 		{
 			name:         "four_word_query_without_stopwords_returns_content",
 			input:        "four word query without stopwords",
@@ -142,7 +133,6 @@ func TestClassify(t *testing.T) {
 			wantStripped: "four word query without stopwords",
 		},
 
-		// Rule 7: default (2-3 words, no stopword) → hybrid
 		{
 			name:         "two_words_returns_hybrid",
 			input:        "two words",
@@ -150,7 +140,6 @@ func TestClassify(t *testing.T) {
 			wantStripped: "two words",
 		},
 
-		// Edge cases: empty and whitespace-only (EDGE-1 / default content branch)
 		{
 			name:         "empty_string_returns_content",
 			input:        "",

@@ -88,7 +88,6 @@ func TestFilenameE2E_RenameAndDelete(t *testing.T) {
 	eng, s := seedFilenameCorpus(t, paths, fake)
 	ctx := context.Background()
 
-	// Helper: run SearchUnified with a nil vector (KindFilename will skip embedding).
 	runFilename := func(t *testing.T, rawQuery string) []search.BlendedResult {
 		t.Helper()
 		kind, _ := query.Classify(rawQuery)
@@ -103,7 +102,6 @@ func TestFilenameE2E_RenameAndDelete(t *testing.T) {
 		return res.Results
 	}
 
-	// Each file should be found before any mutations.
 	for _, tc := range []struct {
 		query    string
 		wantBase string
@@ -127,7 +125,6 @@ func TestFilenameE2E_RenameAndDelete(t *testing.T) {
 		})
 	}
 
-	// Rename engine.go → engine2.go.
 	if err := s.RenameFile("/proj/internal/engine.go", "/proj/internal/engine2.go"); err != nil {
 		t.Fatalf("RenameFile: %v", err)
 	}
@@ -156,7 +153,6 @@ func TestFilenameE2E_RenameAndDelete(t *testing.T) {
 		}
 	})
 
-	// Delete demo.py.
 	if _, err := s.RemoveFileByPath("/proj/scripts/demo.py"); err != nil {
 		t.Fatalf("RemoveFileByPath: %v", err)
 	}
@@ -220,7 +216,6 @@ func TestFilenameE2E_HybridBlending(t *testing.T) {
 			t.Fatalf("UpsertFile(%q): %v", f.path, err)
 		}
 
-		// Embed the content string so semantic search reflects content meaning.
 		vec, _ := fake.EmbedQuery(context.Background(), f.content)
 		vecID := "hyb-" + filepath.Base(f.path)
 		if err := idx.Add(vecID, vec); err != nil {
@@ -288,9 +283,6 @@ func TestFilenameE2E_HybridBlending(t *testing.T) {
 		}
 	})
 
-	// Demonstrate "both" MatchKind: query "engine" is KindHybrid (single identifier)
-	// and "engine" IS a substring of engine.go's filename, so both semantic and
-	// filename pipelines will return it.
 	t.Run("hybrid_single_engine_both_match", func(t *testing.T) {
 		raw := "engine"
 		kind, _ := query.Classify(raw)
@@ -307,8 +299,6 @@ func TestFilenameE2E_HybridBlending(t *testing.T) {
 			t.Errorf("result Kind = %v, want KindHybrid", res.Kind)
 		}
 
-		// engine.go must appear; MatchKind should be "both" since "engine" is in
-		// the filename AND the semantic pipeline also returns it.
 		found := false
 		for _, r := range res.Results {
 			if filepath.Base(r.File.Path) == "engine.go" {
@@ -331,7 +321,6 @@ func TestFilenameE2E_HybridBlending(t *testing.T) {
 			t.Fatalf("expected KindFilename for %q, got %v", raw, kind)
 		}
 
-		// KindFilename: nil vec — engine must not call embedder.
 		res, err := eng.SearchUnified(ctx, raw, nil, query.FilterSpec{}, 10)
 		if err != nil {
 			t.Fatalf("SearchUnified: %v", err)
@@ -393,7 +382,6 @@ func TestFilenameE2E_EmbedderSkip_ExplicitPrefix(t *testing.T) {
 		t.Fatalf("expected KindFilename for %q, got %v", raw, kind)
 	}
 
-	// nil queryVec is correct for KindFilename — engine must handle it.
 	res, err := eng.SearchUnified(context.Background(), stripped, nil, query.FilterSpec{}, 5)
 	if err != nil {
 		t.Fatalf("SearchUnified: %v", err)
@@ -402,8 +390,6 @@ func TestFilenameE2E_EmbedderSkip_ExplicitPrefix(t *testing.T) {
 		t.Errorf("result Kind = %v, want KindFilename", res.Kind)
 	}
 
-	// FakeEmbedder not used at all since we passed nil vec → no call tracking
-	// needed at engine layer. The guarantee is: no panic and correct routing.
 	_ = fake
 }
 

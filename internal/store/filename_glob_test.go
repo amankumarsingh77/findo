@@ -47,7 +47,6 @@ func TestFilenameGlob_BareStarOrderedByModifiedAtDesc(t *testing.T) {
 		t.Fatalf("expected at least 3 results, got %d", len(results))
 	}
 
-	// Verify descending order by modified_at.
 	for i := 1; i < len(results); i++ {
 		if results[i].ModifiedAt.After(results[i-1].ModifiedAt) {
 			t.Errorf("EDGE-7: result[%d] (%s, modified %v) is newer than result[%d] (%s, modified %v) — not DESC order",
@@ -56,7 +55,6 @@ func TestFilenameGlob_BareStarOrderedByModifiedAtDesc(t *testing.T) {
 			)
 		}
 	}
-	// First result must be the newest.
 	if results[0].Path != "/home/user/newest.txt" {
 		t.Errorf("EDGE-7: first result should be newest.txt, got %q", results[0].Path)
 	}
@@ -92,7 +90,6 @@ func TestFilenameGlob_QuestionMark(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FilenameGlob: %v", err)
 	}
-	// file1.go and file2.go should match; file12.go should not.
 	for _, f := range results {
 		if f.Basename == "file12.go" {
 			t.Errorf("file12.go should not match file?.go (? matches exactly one char)")
@@ -117,7 +114,6 @@ func TestFilenameGlob_RespectsLimit(t *testing.T) {
 	s := newStoreForFTS(t)
 	for i := 0; i < 10; i++ {
 		insertFile(t, s, "/home/user/demo_file.go", "text", ".go")
-		// Use unique paths by including index.
 		insertFile(t, s, "/home/user/"+string(rune('a'+i))+".go", "text", ".go")
 	}
 

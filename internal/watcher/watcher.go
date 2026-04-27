@@ -119,7 +119,7 @@ func (w *Watcher) Add(path string) error {
 func (w *Watcher) addRecursive(root string) error {
 	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil // skip errors
+			return nil
 		}
 		if d.IsDir() {
 			return w.fsw.Add(path)
@@ -137,7 +137,7 @@ func (w *Watcher) Remove(path string) error {
 func (w *Watcher) removeRecursive(root string) error {
 	return filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return nil // skip errors
+			return nil
 		}
 		if d.IsDir() {
 			w.fsw.Remove(path)

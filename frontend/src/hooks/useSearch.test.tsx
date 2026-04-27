@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSearch } from './useSearch';
 
-// Mock Wails bindings
 vi.mock('../../wailsjs/go/app/App', () => ({
   PreEmbedQuery: vi.fn(() => Promise.resolve()),
   ParseQuery: vi.fn(),
@@ -10,7 +9,6 @@ vi.mock('../../wailsjs/go/app/App', () => ({
   GetFolders: vi.fn(() => Promise.resolve([])),
 }));
 
-// Mock Wails runtime
 vi.mock('../../wailsjs/runtime/runtime', () => ({
   EventsOn: vi.fn(() => vi.fn()),
   EventsOff: vi.fn(),
@@ -26,7 +24,6 @@ describe('useSearch', () => {
     vi.useFakeTimers({ shouldAdvanceTime: false });
     mockParseQuery.mockReset();
     mockSearchWithFilters.mockReset();
-    // Default: search returns empty results with no error
     mockSearchWithFilters.mockResolvedValue({ results: [], relaxationBanner: '', errorCode: '' });
   });
 
@@ -46,10 +43,8 @@ describe('useSearch', () => {
 
     const { result } = renderHook(() => useSearch());
 
-    // Set the query
     act(() => { result.current.setQuery('hello world'); });
 
-    // Advance past all timers (300ms debounce + 800ms parse)
     await act(async () => { await vi.runAllTimersAsync(); });
 
     expect(result.current.errorCode).toBe('ERR_QUERY_PARSE_FAILED');
@@ -154,10 +149,8 @@ describe('useSearch', () => {
     act(() => { result.current.setQuery('bad query'); });
     await act(async () => { await vi.runAllTimersAsync(); });
 
-    // errorCode was set
     expect(result.current.errorCode).toBe('ERR_QUERY_PARSE_FAILED');
 
-    // Now change query — errorCode should clear immediately
     mockParseQuery.mockResolvedValue({
       chips: [],
       semanticQuery: 'new',
@@ -168,7 +161,6 @@ describe('useSearch', () => {
 
     act(() => { result.current.setQuery('new query'); });
 
-    // errorCode should be cleared synchronously by the keystroke effect
     expect(result.current.errorCode).toBe('');
   });
 

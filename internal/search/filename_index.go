@@ -87,7 +87,6 @@ func (idx *StoreFilenameIndex) queryGlob(pattern string, limit int) ([]FilenameH
 // queryFTS handles standard (non-glob) queries using FTS5 BM25 search followed
 // by fuzzy rescoring.
 func (idx *StoreFilenameIndex) queryFTS(q string, limit int) ([]FilenameHit, error) {
-	// Fetch more candidates than needed so fuzzy rescoring has enough material.
 	topN := idx.fuzzyTopN
 	if topN < limit {
 		topN = limit
@@ -101,7 +100,6 @@ func (idx *StoreFilenameIndex) queryFTS(q string, limit int) ([]FilenameHit, err
 		return nil, nil
 	}
 
-	// Build fuzzy.Candidate slice: Text = basename, Payload = *store.FilenameMatch.
 	candidates := make([]fuzzy.Candidate, len(matches))
 	for i := range matches {
 		candidates[i] = fuzzy.Candidate{
@@ -110,7 +108,6 @@ func (idx *StoreFilenameIndex) queryFTS(q string, limit int) ([]FilenameHit, err
 		}
 	}
 
-	// Fuzzy rescore; request limit results.
 	scored := fuzzy.RescoreTopN(q, candidates, limit)
 
 	hits := make([]FilenameHit, 0, len(scored))
@@ -123,13 +120,11 @@ func (idx *StoreFilenameIndex) queryFTS(q string, limit int) ([]FilenameHit, err
 			finalScore = sc.Score
 		}
 
-		// Determine MatchKind.
 		matchKind := m.MatchKind
 		if m.MatchKind != "exact" && sc.Score > m.Score {
 			matchKind = "fuzzy"
 		}
 
-		// Build highlight ranges.
 		// Prefer fuzzy byte offsets (sc.Matched) when available; fall back to
 		// the FTS highlights from the store.
 		highlights := storeHighlightsToSearch(m.Highlights)
@@ -137,7 +132,6 @@ func (idx *StoreFilenameIndex) queryFTS(q string, limit int) ([]FilenameHit, err
 			highlights = matchedToHighlights(sc.Matched)
 		}
 
-		// Clamp highlights to basename bounds.
 		basenameLen := len(m.File.Basename)
 		highlights = clampHighlights(highlights, basenameLen)
 

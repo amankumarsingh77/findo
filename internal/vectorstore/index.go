@@ -185,7 +185,6 @@ func (idx *Index) Save(path string) error {
 
 	idx.logger.Info("saving index to disk", "path", path, "vectors", len(idx.idToKey))
 
-	// Write graph to temp file, then rename atomically.
 	tmpGraph := path + ".graph.tmp"
 	sg := &hnsw.SavedGraph[int]{
 		Graph: idx.graph,
@@ -195,7 +194,6 @@ func (idx *Index) Save(path string) error {
 		return fmt.Errorf("saving graph: %w", err)
 	}
 
-	// Write map to temp file.
 	tmpMap := path + ".map.tmp"
 	f, err := os.Create(tmpMap)
 	if err != nil {
@@ -212,7 +210,6 @@ func (idx *Index) Save(path string) error {
 	}
 	f.Close()
 
-	// Atomic renames.
 	if err := os.Rename(tmpGraph, path+".graph"); err != nil {
 		return fmt.Errorf("renaming graph: %w", err)
 	}
@@ -227,13 +224,11 @@ func LoadIndex(path string, logger *slog.Logger) (*Index, error) {
 	log := logger.WithGroup("vectorstore")
 	log.Info("loading index from disk", "path", path)
 
-	// Load graph
 	sg, err := hnsw.LoadSavedGraph[int](path + ".graph")
 	if err != nil {
 		return nil, fmt.Errorf("loading graph: %w", err)
 	}
 
-	// Load ID mappings
 	f, err := os.Open(path + ".map")
 	if err != nil {
 		return nil, fmt.Errorf("opening map file: %w", err)

@@ -46,7 +46,6 @@ func (rl *RateLimiter) Allow() bool {
 	now := time.Now()
 	cutoff := now.Add(-rl.window)
 
-	// Remove expired tokens.
 	valid := rl.tokens[:0]
 	for _, t := range rl.tokens {
 		if t.After(cutoff) {
@@ -72,7 +71,6 @@ func (rl *RateLimiter) PauseUntil(t time.Time) {
 	defer rl.mu.Unlock()
 	now := time.Now()
 	if !t.After(now) {
-		// Past or zero: explicit clear — wake all waiters if previously paused.
 		if !rl.pauseUntil.IsZero() && rl.pauseUntil.After(now) {
 			rl.pauseUntil = t
 			rl.broadcastUnpause()

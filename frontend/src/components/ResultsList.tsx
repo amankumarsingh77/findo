@@ -17,7 +17,6 @@ export function ResultsList({ results, selectedIndex, onSelect, onOpen, hasFolde
   const listRef = useRef<HTMLDivElement>(null);
   const itemHeight = 52;
 
-  // Scroll selected item into view
   useEffect(() => {
     if (!listRef.current) return;
     const container = listRef.current;
@@ -33,7 +32,6 @@ export function ResultsList({ results, selectedIndex, onSelect, onOpen, hasFolde
     }
   }, [selectedIndex]);
 
-  // No folders (first-launch onboarding)
   if (!hasFolders) {
     return (
       <div style={styles.container}>
@@ -47,7 +45,6 @@ export function ResultsList({ results, selectedIndex, onSelect, onOpen, hasFolde
     );
   }
 
-  // Has folders but no API key
   if (!hasApiKey) {
     return (
       <div style={styles.container}>
@@ -62,7 +59,6 @@ export function ResultsList({ results, selectedIndex, onSelect, onOpen, hasFolde
     );
   }
 
-  // Results exist
   return (
     <div ref={listRef} style={styles.container} role="listbox" aria-label="Search results">
       {results.map((result, index) => (

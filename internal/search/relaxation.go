@@ -113,7 +113,6 @@ func (l *Ladder) RelaxationLadder(
 			"remaining_must", len(current.Must)-1,
 		)
 
-		// Remove the clause.
 		current.Must = removeMustClause(current.Must, idx)
 	}
 

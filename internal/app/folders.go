@@ -57,7 +57,6 @@ func (a *App) AddFolder(path string) error {
 	if a.watcher != nil {
 		a.watcher.Add(path)
 	}
-	// Queue indexing for the newly added folder.
 	if a.pipeline != nil {
 		patterns, _ := a.store.GetExcludedPatterns()
 		a.pipeline.SubmitFolder(path, patterns, false)
@@ -78,12 +77,10 @@ func (a *App) RemoveFolder(path string, deleteData bool) error {
 		return apperr.Wrap(apperr.ErrStoreLocked.Code, "could not remove folder", err)
 	}
 
-	// Stop watching the folder.
 	if a.watcher != nil {
 		a.watcher.Remove(path)
 	}
 
-	// Remove vectors from the HNSW index.
 	if deleteData && a.index != nil {
 		for _, vid := range vecIDs {
 			a.index.Delete(vid)
@@ -161,7 +158,6 @@ func (a *App) RemoveIgnoredFolder(pattern string) error {
 	return nil
 }
 
-// startWatchingFolders adds all previously indexed folders to the file watcher.
 func (a *App) startWatchingFolders() {
 	runtime.ResetSignalHandlers()
 	if a.watcher == nil || a.store == nil {

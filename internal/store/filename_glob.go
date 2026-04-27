@@ -53,12 +53,9 @@ func (s *Store) FilenameGlob(pattern string, limit int) ([]FileRecord, error) {
 //  2. Replace glob '*' with SQL '%'.
 //  3. Replace glob '?' with SQL '_'.
 func globToLike(pattern string) string {
-	// Step 1: escape the backslash escape character itself first.
 	pattern = strings.ReplaceAll(pattern, `\`, `\\`)
-	// Step 2: escape literal SQL wildcard characters.
 	pattern = strings.ReplaceAll(pattern, `%`, `\%`)
 	pattern = strings.ReplaceAll(pattern, `_`, `\_`)
-	// Step 3: convert glob wildcards to SQL wildcards.
 	pattern = strings.ReplaceAll(pattern, `*`, `%`)
 	pattern = strings.ReplaceAll(pattern, `?`, `_`)
 	return pattern

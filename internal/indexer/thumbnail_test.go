@@ -12,7 +12,6 @@ import (
 func TestGenerateImageThumbnail(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create a 200x100 test PNG image
 	img := image.NewRGBA(image.Rect(0, 0, 200, 100))
 	for y := 0; y < 100; y++ {
 		for x := 0; x < 200; x++ {
@@ -38,7 +37,6 @@ func TestGenerateImageThumbnail(t *testing.T) {
 		t.Fatal("expected non-empty output path")
 	}
 
-	// Verify the thumbnail file exists and is a valid JPEG
 	info, err := os.Stat(outPath)
 	if err != nil {
 		t.Fatalf("thumbnail file not found: %v", err)
@@ -47,7 +45,6 @@ func TestGenerateImageThumbnail(t *testing.T) {
 		t.Fatal("thumbnail file is empty")
 	}
 
-	// Decode and check dimensions
 	thumbF, err := os.Open(outPath)
 	if err != nil {
 		t.Fatal(err)

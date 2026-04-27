@@ -25,11 +25,11 @@ func GenerateThumbnail(filePath, outputDir string, fileType string) (string, err
 	}
 
 	sum := sha256.Sum256([]byte(filePath))
-	name := hex.EncodeToString(sum[:8]) // 16 hex chars from 8 bytes of SHA-256
+	name := hex.EncodeToString(sum[:8])
 	outPath := filepath.Join(outputDir, name+".jpg")
 
 	if _, err := os.Stat(outPath); err == nil {
-		return outPath, nil // already exists
+		return outPath, nil
 	}
 
 	switch fileType {
@@ -38,7 +38,7 @@ func GenerateThumbnail(filePath, outputDir string, fileType string) (string, err
 	case "image":
 		return outPath, generateImageThumbnail(filePath, outPath)
 	default:
-		return "", nil // no thumbnail for text/audio
+		return "", nil
 	}
 }
 
@@ -80,11 +80,9 @@ func generateImageThumbnail(imagePath, outPath string) error {
 	bounds := img.Bounds()
 	w, h := bounds.Dx(), bounds.Dy()
 	if w <= thumbnailSize && h <= thumbnailSize {
-		// Already small enough, just copy as JPEG
 		return saveJPEG(img, outPath)
 	}
 
-	// Simple nearest-neighbor resize (no external dep)
 	var newW, newH int
 	if w > h {
 		newW = thumbnailSize

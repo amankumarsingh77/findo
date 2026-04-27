@@ -10,10 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// ---------------------------------------------------------------------------
-// Grammar parser tests
-// ---------------------------------------------------------------------------
-
 func TestGrammarParse_AllOperators(t *testing.T) {
 	now := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
 	_ = now
@@ -224,10 +220,6 @@ func TestGrammarParse_ExtMultipleExtensions(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// NormalizeDate tests
-// ---------------------------------------------------------------------------
-
 func TestNormalizeDate_RelativePhrase(t *testing.T) {
 	now := time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC)
 
@@ -302,10 +294,6 @@ func TestNormalizeDate_Unparseable(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ParseSize tests
-// ---------------------------------------------------------------------------
-
 func TestParseSize_Units(t *testing.T) {
 	cases := []struct {
 		input     string
@@ -353,10 +341,6 @@ func TestParseSize_Overflow(t *testing.T) {
 		t.Errorf("expected large positive value, got %d", bytes)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// ShouldInvokeLLM tests
-// ---------------------------------------------------------------------------
 
 func TestShouldInvokeLLM_TableDriven(t *testing.T) {
 	cases := []struct {
@@ -419,10 +403,6 @@ func TestShouldInvokeLLM_Over500Chars(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Levenshtein tests
-// ---------------------------------------------------------------------------
-
 func TestLevenshtein_Basic(t *testing.T) {
 	cases := []struct {
 		a, b string
@@ -444,10 +424,6 @@ func TestLevenshtein_Basic(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// CorrectKind tests
-// ---------------------------------------------------------------------------
 
 func TestCorrectKind_Typo(t *testing.T) {
 	cases := []struct {
@@ -478,10 +454,6 @@ func TestCorrectKind_Typo(t *testing.T) {
 		})
 	}
 }
-
-// ---------------------------------------------------------------------------
-// CorrectExtension tests
-// ---------------------------------------------------------------------------
 
 func TestCorrectExtension_Typo(t *testing.T) {
 	cases := []struct {
@@ -514,10 +486,6 @@ func TestCorrectExtension_Typo(t *testing.T) {
 		})
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Merge tests
-// ---------------------------------------------------------------------------
 
 func TestMerge_GrammarWins(t *testing.T) {
 	grammar := FilterSpec{
@@ -609,10 +577,6 @@ func TestMerge_SemanticQueryFromGrammar(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// NormalizeKey tests
-// ---------------------------------------------------------------------------
-
 func TestNormalizeKey_Whitespace(t *testing.T) {
 	cases := []struct {
 		input string
@@ -632,10 +596,6 @@ func TestNormalizeKey_Whitespace(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Cache tests
-// ---------------------------------------------------------------------------
 
 type mockStore struct {
 	data map[string]string
@@ -705,11 +665,9 @@ func TestParsedQueryCache_NormalizedKey(t *testing.T) {
 	cache := NewParsedQueryCache(store)
 
 	spec := FilterSpec{SemanticQuery: "test", Source: SourceGrammar}
-	// Set with unnormalized key
 	if err := cache.Set("  TEST  QUERY!  ", spec); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
-	// Get with differently normalized key should hit
 	got, err := cache.Get("test query")
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
@@ -719,10 +677,6 @@ func TestParsedQueryCache_NormalizedKey(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Source assignment tests
-// ---------------------------------------------------------------------------
-
 func TestParse_SourceIsGrammar(t *testing.T) {
 	spec := Parse("kind:image cats")
 	if spec.Source != SourceGrammar {
@@ -730,11 +684,6 @@ func TestParse_SourceIsGrammar(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Phase 7: Typo correction integration tests
-// ---------------------------------------------------------------------------
-
-// TestGrammarParse_TypoCorrectionKind — "kind:imgae beach" → file_type=image Must clause.
 func TestGrammarParse_TypoCorrectionKind(t *testing.T) {
 	spec := Parse("kind:imgae beach")
 	if spec.SemanticQuery != "beach" {
@@ -756,7 +705,6 @@ func TestGrammarParse_TypoCorrectionKind(t *testing.T) {
 	}
 }
 
-// TestGrammarParse_TypoCorrectionExt — "ext:pef report" → extension in_set [.pdf].
 func TestGrammarParse_TypoCorrectionExt(t *testing.T) {
 	spec := Parse("ext:pef report")
 	if spec.SemanticQuery != "report" {
@@ -781,10 +729,6 @@ func TestGrammarParse_TypoCorrectionExt(t *testing.T) {
 		t.Errorf("expected extension=.pdf after correcting 'pef', got %+v", spec.Must)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// parseNaturalLanguage tests
-// ---------------------------------------------------------------------------
 
 func TestParseNaturalLanguage(t *testing.T) {
 	now := time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC)
@@ -1031,10 +975,6 @@ func TestParseNaturalLanguageDirectionalDates(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// extractSemanticText tests
-// ---------------------------------------------------------------------------
-
 func TestExtractSemanticText(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -1088,10 +1028,6 @@ func TestExtractSemanticText(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// findKindWord tests
-// ---------------------------------------------------------------------------
-
 func TestFindKindWord(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -1143,10 +1079,6 @@ func TestFindKindWord(t *testing.T) {
 		})
 	}
 }
-
-// ---------------------------------------------------------------------------
-// matchTemporalPattern tests
-// ---------------------------------------------------------------------------
 
 func TestMatchTemporalPattern(t *testing.T) {
 	cases := []struct {

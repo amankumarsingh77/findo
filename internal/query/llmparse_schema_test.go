@@ -11,7 +11,6 @@ import (
 func TestBuildResponseSchemaTightened(t *testing.T) {
 	schema := buildResponseSchema()
 
-	// Root Required includes all five top-level fields.
 	wantRequired := []string{"reasoning", "semantic_query", "must", "must_not", "should"}
 	if len(schema.Required) != len(wantRequired) {
 		t.Errorf("root Required: want %v, got %v", wantRequired, schema.Required)
@@ -23,7 +22,6 @@ func TestBuildResponseSchemaTightened(t *testing.T) {
 		}
 	}
 
-	// PropertyOrdering matches design.
 	wantOrdering := []string{"reasoning", "semantic_query", "must", "must_not", "should"}
 	if len(schema.PropertyOrdering) != len(wantOrdering) {
 		t.Errorf("PropertyOrdering: want %v, got %v", wantOrdering, schema.PropertyOrdering)
@@ -35,7 +33,6 @@ func TestBuildResponseSchemaTightened(t *testing.T) {
 		}
 	}
 
-	// Verify clauseSchema via the "must" array items.
 	mustSchema, ok := schema.Properties["must"]
 	if !ok {
 		t.Fatal("schema missing 'must' property")
@@ -45,7 +42,6 @@ func TestBuildResponseSchemaTightened(t *testing.T) {
 		t.Fatal("must.Items is nil")
 	}
 
-	// clauseSchema Required = [field, op, value].
 	wantClauseRequired := []string{"field", "op", "value"}
 	if len(cs.Required) != len(wantClauseRequired) {
 		t.Errorf("clauseSchema Required: want %v, got %v", wantClauseRequired, cs.Required)
@@ -57,7 +53,6 @@ func TestBuildResponseSchemaTightened(t *testing.T) {
 		}
 	}
 
-	// field.Enum == fieldEnumValues.
 	fieldSchema, ok := cs.Properties["field"]
 	if !ok {
 		t.Fatal("clauseSchema missing 'field' property")
@@ -66,7 +61,6 @@ func TestBuildResponseSchemaTightened(t *testing.T) {
 		t.Errorf("field.Enum len: want %d, got %d", len(fieldEnumValues), len(fieldSchema.Enum))
 	}
 
-	// op.Enum == opEnumValues.
 	opSchema, ok := cs.Properties["op"]
 	if !ok {
 		t.Fatal("clauseSchema missing 'op' property")
@@ -75,7 +69,6 @@ func TestBuildResponseSchemaTightened(t *testing.T) {
 		t.Errorf("op.Enum len: want %d, got %d", len(opEnumValues), len(opSchema.Enum))
 	}
 
-	// boost.Minimum == 0.0 and .Maximum == 5.0.
 	boostSchema, ok := cs.Properties["boost"]
 	if !ok {
 		t.Fatal("clauseSchema missing 'boost' property")
@@ -98,30 +91,24 @@ func TestBuildResponseSchemaTightened(t *testing.T) {
 func TestBuildGenerateContentConfig(t *testing.T) {
 	cfg := buildGenerateContentConfig("test system prompt")
 
-	// No Tools.
 	if len(cfg.Tools) != 0 {
 		t.Errorf("expected no Tools, got %d", len(cfg.Tools))
 	}
-	// No ToolConfig.
 	if cfg.ToolConfig != nil {
 		t.Error("expected nil ToolConfig")
 	}
-	// ResponseMIMEType == "application/json".
 	if cfg.ResponseMIMEType != "application/json" {
 		t.Errorf("ResponseMIMEType: want %q, got %q", "application/json", cfg.ResponseMIMEType)
 	}
-	// ResponseSchema non-nil.
 	if cfg.ResponseSchema == nil {
 		t.Error("ResponseSchema is nil")
 	}
-	// SystemInstruction preserved.
 	if cfg.SystemInstruction == nil {
 		t.Fatal("SystemInstruction is nil")
 	}
 	if len(cfg.SystemInstruction.Parts) == 0 || cfg.SystemInstruction.Parts[0].Text != "test system prompt" {
 		t.Errorf("SystemInstruction not preserved correctly")
 	}
-	// Temperature == 0.
 	if cfg.Temperature == nil {
 		t.Fatal("Temperature is nil")
 	}
@@ -147,7 +134,6 @@ func TestRetryLoopStillWorks(t *testing.T) {
 	generate := func(ctx context.Context, model string, contents []*genai.Content, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
 		callCount++
 		if callCount < 3 {
-			// First two calls return malformed JSON.
 			return &genai.GenerateContentResponse{
 				Candidates: []*genai.Candidate{{
 					Content: &genai.Content{
@@ -156,7 +142,6 @@ func TestRetryLoopStillWorks(t *testing.T) {
 				}},
 			}, nil
 		}
-		// Third call returns valid JSON.
 		return &genai.GenerateContentResponse{
 			Candidates: []*genai.Candidate{{
 				Content: &genai.Content{

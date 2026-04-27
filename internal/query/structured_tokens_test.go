@@ -14,10 +14,8 @@ func TestDetectStructuredFields(t *testing.T) {
 		name  string
 		input string
 		want  StructuredSignal
-		// REQ/EDGE reference for documentation
-		req string
+		req   string
 	}{
-		// --- REQ-001: all-false for queries with no structured intent.
 		// Note: "photos" and "videos" etc. ARE structured intent (they map to
 		// file_type), so a truly semantic-only query must avoid those words.
 		{
@@ -27,7 +25,6 @@ func TestDetectStructuredFields(t *testing.T) {
 			req:   "REQ-001",
 		},
 
-		// --- REQ-002: bare extension detection ---
 		{
 			name:  "bare .py extension",
 			input: "all .py files",
@@ -49,7 +46,6 @@ func TestDetectStructuredFields(t *testing.T) {
 			req:   "REQ-002",
 		},
 
-		// --- REQ-003: kind synonyms (case-insensitive, whole-word) ---
 		{
 			name:  "video as kind word",
 			input: "video taken on the mountain",
@@ -69,7 +65,6 @@ func TestDetectStructuredFields(t *testing.T) {
 			req:   "REQ-003",
 		},
 
-		// --- REQ-004: size with unit ---
 		{
 			name:  "100MB no space",
 			input: "100MB",
@@ -95,7 +90,6 @@ func TestDetectStructuredFields(t *testing.T) {
 			req:   "REQ-004, EDGE-004",
 		},
 
-		// --- REQ-005: size adjectives ---
 		{
 			name:  "large adjective",
 			input: "large videos",
@@ -121,7 +115,6 @@ func TestDetectStructuredFields(t *testing.T) {
 			req:   "REQ-005",
 		},
 
-		// --- REQ-006: temporal tokens ---
 		{
 			name:  "last week phrase",
 			input: "files from last week",
@@ -159,7 +152,6 @@ func TestDetectStructuredFields(t *testing.T) {
 			req:   "REQ-006",
 		},
 
-		// --- REQ-007: path detection ---
 		{
 			name:  "files in Downloads",
 			input: "files in Downloads",
@@ -195,7 +187,6 @@ func TestDetectStructuredFields(t *testing.T) {
 			req:   "REQ-007",
 		},
 
-		// --- EDGE-001: empty string ---
 		{
 			name:  "empty string returns all false",
 			input: "",
@@ -203,7 +194,6 @@ func TestDetectStructuredFields(t *testing.T) {
 			req:   "EDGE-001",
 		},
 
-		// --- EDGE-003: word-boundary check for kind words ---
 		{
 			name:  "videogame does not trigger FileType",
 			input: "videogame",
@@ -221,7 +211,6 @@ func TestDetectStructuredFields(t *testing.T) {
 			req:   "EDGE-003",
 		},
 
-		// --- EDGE-004: number with non-size unit ---
 		{
 			name:  "100 monkeys does not trigger SizeBytes",
 			input: "100 monkeys",
@@ -229,7 +218,6 @@ func TestDetectStructuredFields(t *testing.T) {
 			req:   "EDGE-004",
 		},
 
-		// --- EDGE-014: combined signals ---
 		{
 			name:  "yesterday and .py files trigger both ModifiedAt and Extension",
 			input: "yesterday's .py files",
@@ -310,7 +298,6 @@ func TestDetectStructuredFields_Concurrent(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			input := inputs[i%len(inputs)]
-			// Just ensure no panic / race condition.
 			_ = DetectStructuredFields(input)
 		}()
 	}

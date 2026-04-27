@@ -9,19 +9,13 @@ import (
 	"findo/internal/vectorstore"
 )
 
-// mockPlannerStore is a controllable store for relaxation tests.
-// It returns results only when the given spec has no Must clauses
-// or when allowedMustFields is empty (meaning all Must dropped).
 type mockPlannerStore struct {
-	// returnResultsWhenMustEmpty: if true, return results when Must is empty
-	returnResultsWhenMustEmpty bool
-	// returnResultsFor: field that, when removed from Must, causes results to appear
+	returnResultsWhenMustEmpty      bool
 	returnResultsWhenMustLacksField query.FieldEnum
 	files                           []store.FileRecord
 }
 
 func (m *mockPlannerStore) CountFiltered(spec store.FilterSpec) (int, error) {
-	// If we have the condition to return results, pretend there are matching files
 	if m.returnResultsWhenMustEmpty && len(spec.Must) == 0 {
 		return len(m.files), nil
 	}
@@ -68,7 +62,6 @@ func (m *mockPlannerStore) CountFiles() (int, error) {
 func TestRelaxation_DropsDateFirst(t *testing.T) {
 	idx := vectorstore.NewDefaultIndex(testLogger)
 
-	// Store returns results only when modified_at Must clause is absent
 	ms := &mockPlannerStore{
 		returnResultsWhenMustLacksField: query.FieldModifiedAt,
 		files: []store.FileRecord{
@@ -76,7 +69,6 @@ func TestRelaxation_DropsDateFirst(t *testing.T) {
 		},
 	}
 
-	// Add a vector so brute-force finds it
 	v := make([]float32, 768)
 	v[0] = 1.0
 	_ = idx.Add("vec-brute", v)
@@ -103,7 +95,6 @@ func TestRelaxation_DropsDateFirst(t *testing.T) {
 	if droppedDesc == "" {
 		t.Error("expected non-empty droppedDesc, got empty string")
 	}
-	// Should mention "date"
 	if droppedDesc != "date filter" {
 		t.Errorf("expected droppedDesc=%q, got %q", "date filter", droppedDesc)
 	}
@@ -113,7 +104,6 @@ func TestRelaxation_DropsDateFirst(t *testing.T) {
 func TestRelaxation_NeverDropsMustNot(t *testing.T) {
 	idx := vectorstore.NewDefaultIndex(testLogger)
 
-	// Store returns results when Must is empty (all Must dropped)
 	ms := &mockPlannerStore{
 		returnResultsWhenMustEmpty: true,
 		files: []store.FileRecord{
@@ -160,7 +150,6 @@ func TestRelaxation_FallsBackToEmptySpec(t *testing.T) {
 	defer db.Close()
 	idx := vectorstore.NewDefaultIndex(testLogger)
 
-	// Insert a file with a vector into the real store+index.
 	fileID, err := db.UpsertFile(store.FileRecord{
 		Path: "/tmp/fallback.txt", FileType: "text", Extension: ".txt", SizeBytes: 100,
 	})
@@ -179,7 +168,6 @@ func TestRelaxation_FallsBackToEmptySpec(t *testing.T) {
 
 	planner := NewPlanner(db, idx, DefaultPlannerConfig())
 
-	// Use an impossible future date so no files match the Must clause.
 	spec := query.FilterSpec{
 		SemanticQuery: "something important",
 		Must: []query.Clause{
@@ -196,7 +184,6 @@ func TestRelaxation_FallsBackToEmptySpec(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RelaxationLadder error: %v", err)
 	}
-	// After dropping the date Must clause, the semantic fallback finds the file.
 	if len(results) == 0 {
 		t.Fatal("expected results from final fallback, got none")
 	}

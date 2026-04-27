@@ -58,7 +58,6 @@ func (h *ColorHandler) Handle(_ context.Context, r slog.Record) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Time
 	t := r.Time.Format("15:04:05.000")
 
 	// Level with color
@@ -68,18 +67,15 @@ func (h *ColorHandler) Handle(_ context.Context, r slog.Record) error {
 		fmt.Fprintf(h.w, "%s%s %5s%s %s", colorGray, t, levelColor, levelStr, colorReset+r.Message)
 	}
 
-	// Groups prefix
 	prefix := ""
 	for _, g := range h.groups {
 		prefix += g + "."
 	}
 
-	// Pre-defined attrs
 	for _, a := range h.attrs {
 		h.writeAttr(prefix, a)
 	}
 
-	// Record attrs
 	r.Attrs(func(a slog.Attr) bool {
 		h.writeAttr(prefix, a)
 		return true

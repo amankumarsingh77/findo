@@ -16,7 +16,6 @@ import (
 	"findo/internal/vectorstore"
 )
 
-// failingEmbedder is an Embedder that always fails with a non-retriable error.
 type failingEmbedder struct{ err error }
 
 func (f *failingEmbedder) ModelID() string        { return "test-model" }
@@ -30,7 +29,6 @@ func (f *failingEmbedder) EmbedQuery(_ context.Context, _ string) ([]float32, er
 	return nil, f.err
 }
 
-// REF-063: Search-time embed failure surfaces as apperr.ErrEmbedFailed code.
 func TestApp_EmbeddingFailureSurfacesAsErrEmbedFailed(t *testing.T) {
 	s, err := store.NewStore(":memory:", slog.Default())
 	if err != nil {
@@ -59,7 +57,6 @@ func TestApp_EmbeddingFailureSurfacesAsErrEmbedFailed(t *testing.T) {
 	}
 }
 
-// REF-063: AddFolder with an invalid path surfaces as apperr.ErrFolderDenied.
 func TestApp_FolderAddError_SurfacesErrFolderDenied(t *testing.T) {
 	s, err := store.NewStore(":memory:", slog.Default())
 	if err != nil {
@@ -73,7 +70,6 @@ func TestApp_FolderAddError_SurfacesErrFolderDenied(t *testing.T) {
 		logger: slog.Default(),
 	}
 
-	// Empty path - the store layer rejects it; AddFolder should wrap that.
 	gotErr := a.AddFolder("")
 	if gotErr == nil {
 		t.Fatalf("expected error for empty path, got nil")
@@ -87,7 +83,6 @@ func TestApp_FolderAddError_SurfacesErrFolderDenied(t *testing.T) {
 	}
 }
 
-// REF-063: AddIgnoredFolder with empty pattern returns typed error.
 func TestApp_AddIgnoredFolder_Empty_SurfacesErrConfigInvalid(t *testing.T) {
 	s, err := store.NewStore(":memory:", slog.Default())
 	if err != nil {
@@ -109,10 +104,6 @@ func TestApp_AddIgnoredFolder_Empty_SurfacesErrConfigInvalid(t *testing.T) {
 	}
 }
 
-// TestApp_SearchWithFilters_ModelMismatch_SurfacesErrorCode (REF-062):
-// When the engine returns ErrModelMismatch, SearchWithFilters returns nil
-// Go error but populates SearchWithFiltersResult.ErrorCode =
-// "ERR_MODEL_MISMATCH" so the frontend can render the reindex banner.
 func TestApp_SearchWithFilters_ModelMismatch_SurfacesErrorCode(t *testing.T) {
 	dbPath := t.TempDir() + "/test.db"
 	s, err := store.NewStore(dbPath, slog.Default())
@@ -121,7 +112,6 @@ func TestApp_SearchWithFilters_ModelMismatch_SurfacesErrorCode(t *testing.T) {
 	}
 	t.Cleanup(func() { s.Close() })
 
-	// Seed: one file + chunk indexed under model "fake-a".
 	fileID, err := s.UpsertFile(store.FileRecord{
 		Path: "/tmp/a.txt", FileType: "text", Extension: ".txt", SizeBytes: 1,
 	})
@@ -143,7 +133,6 @@ func TestApp_SearchWithFilters_ModelMismatch_SurfacesErrorCode(t *testing.T) {
 
 	cfg := search.DefaultEngineConfig()
 	planner := search.NewPlannerWithLogger(s, idx, cfg.Planner, slog.Default())
-	// Engine configured for "fake-b" so all fake-a chunks get filtered out.
 	engine := search.NewWithModel(s, idx, slog.Default(), planner, cfg, "fake-b")
 
 	a := &App{

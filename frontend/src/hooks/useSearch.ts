@@ -38,11 +38,9 @@ export function useSearch() {
   // the flag for an in-flight newer parse.
   const parseSeqRef = useRef(0);
 
-  // Track current phase outside reducer to avoid stale closure issues
   const phaseRef = useRef(nlState.phase);
   phaseRef.current = nlState.phase;
 
-  // Reflects the current errorCode for use inside debounce callbacks
   const errorCodeRef = useRef('');
 
   // Holds the raw unfiltered results from the last server fetch.
@@ -51,7 +49,6 @@ export function useSearch() {
   // The semanticQuery that was used for the last server fetch embedding.
   const lastSemanticQueryRef = useRef<string>('');
 
-  // Keep errorCodeRef in sync with state
   useEffect(() => {
     errorCodeRef.current = errorCode;
   }, [errorCode]);
@@ -72,7 +69,6 @@ export function useSearch() {
       return;
     }
 
-    // If a parse error is active, skip the search
     if (errorCodeRef.current) return;
 
     const { chipTriggered = false } = options;
@@ -90,7 +86,6 @@ export function useSearch() {
           denyList,
         );
         if (filtered.length >= CLIENT_FILTER_MIN_RESULTS) {
-          // Enough results — use the client-filtered set, skip server call.
           setResults(filtered);
           setSelectedIndex(0);
           return;
@@ -98,10 +93,8 @@ export function useSearch() {
         // Too few results after filtering — fall through to server call so
         // the planner can retrieve more results with proper filter pushdown.
       }
-      // semanticQuery changed — need new HNSW embedding, fall through to server.
     }
 
-    // Full server call path
     setIsSearching(true);
     setError(null);
 
@@ -147,7 +140,6 @@ export function useSearch() {
       const result = await ParseQuery(q);
       if (result) {
         if (result.errorCode) {
-          // Hard failure from parse: block search, surface error
           setErrorCode(result.errorCode);
           setRetryAfterMs(result.retryAfterMs ?? 0);
           setWarning('');
@@ -158,13 +150,11 @@ export function useSearch() {
         }
 
         if (result.warning) {
-          // Soft warning: search continues but we surface the warning
           setWarning(result.warning);
           setErrorCode('');
           setRetryAfterMs(0);
           errorCodeRef.current = '';
         } else {
-          // All clear
           setWarning('');
           setErrorCode('');
           setRetryAfterMs(0);
@@ -178,7 +168,7 @@ export function useSearch() {
         setIsOffline(result.isOffline ?? false);
       }
     } catch {
-      // Ignore parse errors — fall back to plain search
+      // Parse failures are non-fatal; plain search still runs.
     } finally {
       // Only the most recent parse may clear the gate. Stale resolutions
       // from a previous keystroke must not unblock the keystroke-debounced
@@ -206,7 +196,6 @@ export function useSearch() {
     performSearch(nlState.raw, nlState.semanticQuery, nlState.chips, nlState.chipDenyList);
   }, [nlState.raw, nlState.semanticQuery, nlState.chips, nlState.chipDenyList, performSearch]);
 
-  // Effect for debounced search + parse query timer (triggered by raw query changes)
   useEffect(() => {
     const q = nlState.raw;
 
@@ -214,11 +203,9 @@ export function useSearch() {
     if (preEmbedRef.current) clearTimeout(preEmbedRef.current);
     if (parseTimerRef.current) clearTimeout(parseTimerRef.current);
 
-    // Clear stale unfiltered results from a previous query
     unfilteredResultsRef.current = [];
     lastSemanticQueryRef.current = '';
 
-    // Clear error state on new keystroke so stale banners don't persist
     setErrorCode('');
     setWarning('');
     setRetryAfterMs(0);
@@ -234,18 +221,14 @@ export function useSearch() {
       parseSeqRef.current += 1;
       parsePendingRef.current = true;
 
-      // 800ms idle timer for ParseQuery.
       parseTimerRef.current = setTimeout(() => {
         runParseQuery(q);
       }, 800);
     } else {
-      // No parse will fire for short queries — nothing to wait on.
       parsePendingRef.current = false;
     }
 
-    // 300ms debounce for search — always a full server call (no chips yet)
     debounceRef.current = setTimeout(() => {
-      // Skip if a parse error has already fired (rare race, but guards it)
       if (errorCodeRef.current) return;
       // If a parse is in flight, let the post-parse chip-change effect drive
       // the canonical search instead of firing a duplicate with stale state.
@@ -261,7 +244,6 @@ export function useSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nlState.raw]);
 
-  // Re-run search when chips/denyList change — try client-side filter first
   useEffect(() => {
     if (nlState.raw.trim() && !errorCodeRef.current) {
       performSearch(

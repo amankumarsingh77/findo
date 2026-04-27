@@ -72,7 +72,6 @@ func (p *Pipeline) ReconcileIndex() {
 	// in SQLite (phase 1 of the two-phase commit) but never completed — e.g.
 	// the app was killed while embedding was in flight. ReconcileIndex misses
 	// them because their partial chunks (if any) may all be present in HNSW.
-	// Build a set of already-queued file IDs to avoid double-counting.
 	alreadyQueued := make(map[int64]bool, len(toReindex))
 	for _, id := range toReindex {
 		alreadyQueued[id] = true
@@ -145,12 +144,10 @@ func (p *Pipeline) StartupRescan(folders []string) {
 
 			existing, err := p.store.GetFileByPath(path)
 			if err != nil {
-				// File not in SQLite yet — submit for indexing.
 				p.SubmitFile(path)
 				return nil
 			}
 
-			// Re-index if mtime has changed.
 			if !fsInfo.ModTime().Equal(existing.ModifiedAt) {
 				log.Info("file modified since last index, queuing", "path", path)
 				p.SubmitFile(path)
@@ -163,7 +160,6 @@ func (p *Pipeline) StartupRescan(folders []string) {
 		}
 	}
 
-	// Remove SQLite records for files that no longer exist on disk.
 	p.cleanupDeletedFiles(log)
 
 	log.Info("startup rescan complete")

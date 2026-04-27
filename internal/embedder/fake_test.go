@@ -70,7 +70,6 @@ func TestFakeEmbedder_EmbedBatch(t *testing.T) {
 	if len(got) != 3 {
 		t.Fatalf("len(got)=%d want 3", len(got))
 	}
-	// element 1 equals EmbedQuery of the same effective key
 	key := inputs[1].Title + "|" + inputs[1].Text + "|" + string(inputs[1].Data)
 	want, _ := f.EmbedQuery(context.Background(), key)
 	for i := range want {

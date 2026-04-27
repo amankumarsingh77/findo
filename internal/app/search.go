@@ -17,7 +17,6 @@ import (
 func (a *App) Search(queryText string) ([]SearchResultDTO, error) {
 	a.logger.Info("search query", "query", queryText)
 
-	// Classify first; only embed for content/hybrid kinds.
 	// The embed step runs before the engine nil-check so that embedding errors
 	// are surfaced as ERR_EMBED_FAILED rather than ERR_INTERNAL.
 	kind, vec, err := a.classifyAndEmbed(queryText)
@@ -96,7 +95,6 @@ func (a *App) PreEmbedQuery(queryText string) {
 	}
 }
 
-// isNLQueryEnabled returns true unless nl_query_enabled is explicitly set to "false".
 func (a *App) isNLQueryEnabled() bool {
 	if a.store == nil {
 		return true
@@ -122,7 +120,6 @@ func (a *App) ParseQuery(raw string) (ParseQueryResult, error) {
 
 	a.logger.Debug("parse_query: start", "raw", raw, "offline", offline)
 
-	// Grammar parse — always, no network.
 	grammarSpec := query.Parse(raw)
 	a.logger.Debug("parse_query: grammar parsed",
 		"must", len(grammarSpec.Must),
@@ -131,7 +128,6 @@ func (a *App) ParseQuery(raw string) (ParseQueryResult, error) {
 		"semantic_query", grammarSpec.SemanticQuery,
 	)
 
-	// Check cache before LLM.
 	var mergedSpec query.FilterSpec
 	cacheHit := false
 	if a.parsedQueryCache != nil {
@@ -155,7 +151,6 @@ func (a *App) ParseQuery(raw string) (ParseQueryResult, error) {
 		}
 		llmSpec := grammarSpec
 		trigger := query.Trigger{MinTokens: a.cfg.Query.TriggerMinTokens, MaxChars: a.cfg.Query.TriggerMaxChars}
-		// Skip LLM when offline.
 		shouldInvoke := !offline && trigger.ShouldInvokeLLM(grammarSpec.SemanticQuery) && llmParser != nil && a.ctx != nil
 		a.logger.Debug("parse_query: LLM invocation decision",
 			"should_invoke", shouldInvoke,
@@ -192,7 +187,6 @@ func (a *App) ParseQuery(raw string) (ParseQueryResult, error) {
 						"should", len(llmSpec.Should),
 					)
 				case query.OutcomeTimeout:
-					// Use grammar spec; set Warning; skip cache write below.
 					a.logger.Debug("parse_query: LLM parse timed out, using grammar-only", "latency_ms", elapsed)
 					mergedSpec = query.Merge(grammarSpec, grammarSpec, nil)
 					chips := buildChipDTOs(mergedSpec)
@@ -224,7 +218,6 @@ func (a *App) ParseQuery(raw string) (ParseQueryResult, error) {
 			"semantic_query", mergedSpec.SemanticQuery,
 			"source", mergedSpec.Source,
 		)
-		// Only write to cache on successful (OK) outcome.
 		if a.parsedQueryCache != nil {
 			_ = a.parsedQueryCache.Set(raw, mergedSpec)
 			a.logger.Debug("parse_query: stored in cache")

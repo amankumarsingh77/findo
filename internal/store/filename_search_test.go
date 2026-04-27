@@ -7,7 +7,6 @@ import (
 	"time"
 )
 
-// newStoreForFTS creates a fresh in-memory store for FTS5 tests.
 func newStoreForFTS(t *testing.T) *Store {
 	t.Helper()
 	s, err := NewStore(":memory:", testLogger)
@@ -18,7 +17,6 @@ func newStoreForFTS(t *testing.T) *Store {
 	return s
 }
 
-// insertFile is a helper to insert a file into the store for testing.
 func insertFile(t *testing.T, s *Store, path, fileType, ext string) int64 {
 	t.Helper()
 	id, err := s.UpsertFile(FileRecord{
@@ -101,7 +99,6 @@ func TestFilenameSearch_SubstringMatch(t *testing.T) {
 	if len(results) == 0 {
 		t.Fatal("expected at least one result for 'demo', got 0")
 	}
-	// demo.py should be in the results via FTS substring match.
 	found := false
 	for _, r := range results {
 		if r.File.Path == "/src/demo.py" {
@@ -154,7 +151,6 @@ func TestFilenameSearch_ExtensionQuery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FilenameSearch 'py': %v", err)
 	}
-	// 2-char queries are not an error, they just return no FTS results.
 	_ = pyResults
 }
 
@@ -192,12 +188,10 @@ func TestFilenameSearch_TriggerSync_Update(t *testing.T) {
 	newPath := "/projects/myapp/new_service.go"
 	insertFile(t, s, oldPath, "text", ".go")
 
-	// Rename triggers the after-update trigger.
 	if err := s.RenameFile(oldPath, newPath); err != nil {
 		t.Fatalf("RenameFile: %v", err)
 	}
 
-	// Old name should not appear.
 	oldResults, err := s.FilenameSearch("old_service.go", 10)
 	if err != nil {
 		t.Fatalf("FilenameSearch old name: %v", err)
@@ -208,7 +202,6 @@ func TestFilenameSearch_TriggerSync_Update(t *testing.T) {
 		}
 	}
 
-	// New name should appear.
 	newResults, err := s.FilenameSearch("new_service.go", 10)
 	if err != nil {
 		t.Fatalf("FilenameSearch new name: %v", err)
@@ -235,7 +228,6 @@ func TestFilenameSearch_TriggerSync_Delete(t *testing.T) {
 	path := "/projects/todelete/secret.txt"
 	id := insertFile(t, s, path, "text", ".txt")
 
-	// Verify it's findable before delete.
 	before, err := s.FilenameSearch("secret.txt", 10)
 	if err != nil {
 		t.Fatalf("FilenameSearch before delete: %v", err)
@@ -244,12 +236,10 @@ func TestFilenameSearch_TriggerSync_Delete(t *testing.T) {
 		t.Fatal("expected to find secret.txt before delete")
 	}
 
-	// Delete the file.
 	if _, err := s.db.Exec(`DELETE FROM files WHERE id = ?`, id); err != nil {
 		t.Fatalf("DELETE from files: %v", err)
 	}
 
-	// Should no longer appear in FTS.
 	after, err := s.FilenameSearch("secret.txt", 10)
 	if err != nil {
 		t.Fatalf("FilenameSearch after delete: %v", err)
@@ -270,7 +260,6 @@ func TestFilenameSearch_Deduplication(t *testing.T) {
 
 	insertFile(t, s, "/src/demo.py", "text", ".py")
 
-	// Querying the exact name may appear in both exact and FTS phases.
 	results, err := s.FilenameSearch("demo.py", 10)
 	if err != nil {
 		t.Fatalf("FilenameSearch: %v", err)
@@ -294,7 +283,6 @@ func TestFilenameSearch_HonorsLimit(t *testing.T) {
 		t.Skip("FTS5 not available")
 	}
 
-	// Insert 5 .go files.
 	for i := 0; i < 5; i++ {
 		path := "/src/file" + string(rune('a'+i)) + ".go"
 		insertFile(t, s, path, "text", ".go")
@@ -329,7 +317,6 @@ func TestFilenameSearch_HighlightOffsets(t *testing.T) {
 
 	for _, r := range results {
 		basename := r.File.Basename
-		// Sentinel bytes must not appear in the cleaned basename.
 		if strings.Contains(basename, "\x02") || strings.Contains(basename, "\x03") {
 			t.Errorf("Basename %q contains sentinel bytes", basename)
 		}
@@ -431,10 +418,10 @@ func TestEscapeFTS5(t *testing.T) {
 // TestExtractHighlights verifies that sentinel-annotated strings are parsed correctly.
 func TestExtractHighlights(t *testing.T) {
 	tests := []struct {
-		name           string
-		input          string
-		wantClean      string
-		wantRanges     []HighlightRange
+		name       string
+		input      string
+		wantClean  string
+		wantRanges []HighlightRange
 	}{
 		{
 			name:      "no highlights",
@@ -442,27 +429,27 @@ func TestExtractHighlights(t *testing.T) {
 			wantClean: "demo.py",
 		},
 		{
-			name:      "single highlight at start",
-			input:     "\x02dem\x03o.py",
-			wantClean: "demo.py",
+			name:       "single highlight at start",
+			input:      "\x02dem\x03o.py",
+			wantClean:  "demo.py",
 			wantRanges: []HighlightRange{{Start: 0, End: 3}},
 		},
 		{
-			name:      "single highlight in middle",
-			input:     "de\x02mo\x03.py",
-			wantClean: "demo.py",
+			name:       "single highlight in middle",
+			input:      "de\x02mo\x03.py",
+			wantClean:  "demo.py",
 			wantRanges: []HighlightRange{{Start: 2, End: 4}},
 		},
 		{
-			name:      "multiple highlights",
-			input:     "\x02dem\x03o_\x02ser\x03vice.go",
-			wantClean: "demo_service.go",
+			name:       "multiple highlights",
+			input:      "\x02dem\x03o_\x02ser\x03vice.go",
+			wantClean:  "demo_service.go",
 			wantRanges: []HighlightRange{{Start: 0, End: 3}, {Start: 5, End: 8}},
 		},
 		{
-			name:      "highlight at end",
-			input:     "demo\x02.py\x03",
-			wantClean: "demo.py",
+			name:       "highlight at end",
+			input:      "demo\x02.py\x03",
+			wantClean:  "demo.py",
 			wantRanges: []HighlightRange{{Start: 4, End: 7}},
 		},
 		{
@@ -494,7 +481,6 @@ func TestExtractHighlights(t *testing.T) {
 // FilenameSearch returns empty without error.
 func TestFilenameSearch_FTSUnavailable(t *testing.T) {
 	s := newStoreForFTS(t)
-	// Override ftsReady to false to simulate unavailable FTS5.
 	s.filenameFTSReady = false
 
 	insertFile(t, s, "/src/demo.py", "text", ".py")
@@ -577,8 +563,6 @@ func TestFilenameSearch_ExactScoreHigherThanFTS(t *testing.T) {
 		t.Skip("FTS5 not available")
 	}
 
-	// Insert a file whose basename exactly matches the query and another that
-	// only matches via substring.
 	insertFile(t, s, "/a/demo.py", "text", ".py")
 	insertFile(t, s, "/b/awesome_demo_project.py", "text", ".py")
 
@@ -589,7 +573,6 @@ func TestFilenameSearch_ExactScoreHigherThanFTS(t *testing.T) {
 	if len(results) == 0 {
 		t.Fatal("expected results for 'demo.py'")
 	}
-	// First result must be the exact match.
 	if results[0].MatchKind != "exact" {
 		t.Errorf("expected first result to be 'exact', got %q", results[0].MatchKind)
 	}

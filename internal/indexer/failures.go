@@ -29,7 +29,6 @@ type FailureGroup struct {
 // codeLabel returns the human-readable message for a known apperr code, falling
 // back to the raw code string for codes not in the vocabulary (EDGE-012).
 func codeLabel(code string) string {
-	// Walk the known errors to find a matching code.
 	knownErrors := []*apperr.Error{
 		apperr.ErrUnsupportedFormat,
 		apperr.ErrExtractionFailed,
@@ -90,7 +89,6 @@ func (r *FailureRegistry) Record(path, code, message string, attempts int) {
 	defer r.mu.Unlock()
 
 	if elem, ok := r.entries[path]; ok {
-		// Update in place — do NOT move position in the list (REQ-012).
 		entry := elem.Value.(*FailureEntry)
 		entry.Code = code
 		entry.Message = message
@@ -99,7 +97,6 @@ func (r *FailureRegistry) Record(path, code, message string, attempts int) {
 		return
 	}
 
-	// Evict the oldest entry if we are at capacity (REQ-015).
 	if r.order.Len() >= r.cap {
 		front := r.order.Front()
 		if front != nil {
@@ -110,7 +107,6 @@ func (r *FailureRegistry) Record(path, code, message string, attempts int) {
 		}
 	}
 
-	// Append new entry.
 	entry := &FailureEntry{
 		Path:         path,
 		Code:         code,
@@ -141,7 +137,7 @@ func (r *FailureRegistry) Snapshot() []FailureEntry {
 	result := make([]FailureEntry, 0, r.order.Len())
 	for elem := r.order.Front(); elem != nil; elem = elem.Next() {
 		e := elem.Value.(*FailureEntry)
-		result = append(result, *e) // copy the struct
+		result = append(result, *e)
 	}
 	return result
 }

@@ -8,9 +8,6 @@ import (
 	"findo/internal/search"
 )
 
-// buildSearchEngine constructs the search.Engine for startup, wiring the
-// planner, reranker, relaxation ladder, filename index, and blend config from
-// the app's current config.
 func (a *App) buildSearchEngine() *search.Engine {
 	plannerCfg := search.PlannerConfig{
 		BruteForceThreshold: a.getBruteForceThreshold(),
@@ -18,7 +15,6 @@ func (a *App) buildSearchEngine() *search.Engine {
 	}
 	planner := search.NewPlannerWithLogger(a.store, a.index, plannerCfg, a.logger.WithGroup("planner"))
 
-	// Wire the filename pipeline when enabled.
 	var filenameIdx search.FilenameIndex
 	blendCfg := search.BlendConfig{
 		RrfK:       a.cfg.FilenameSearch.RrfK,
@@ -38,8 +34,6 @@ func (a *App) buildSearchEngine() *search.Engine {
 	})
 }
 
-// blendedToSearchResultDTO converts a search.BlendedResult to a SearchResultDTO,
-// populating MatchKind and Highlights from the blended result.
 func blendedToSearchResultDTO(r search.BlendedResult) SearchResultDTO {
 	dto := SearchResultDTO{
 		FilePath:      r.File.Path,
@@ -72,16 +66,12 @@ func blendedToSearchResultDTO(r search.BlendedResult) SearchResultDTO {
 func (a *App) classifyAndEmbed(raw string) (kind query.QueryKind, vec []float32, err error) {
 	kind, _ = query.Classify(raw)
 
-	// Skip embedding entirely for pure filename queries — saves a Gemini call.
 	if kind == query.KindFilename {
 		return kind, nil, nil
 	}
 
 	emb, _ := a.snapshotEmbedderState()
 	if emb == nil {
-		// No embedder — return nil vector; the engine will handle it gracefully
-		// by detecting nil filenameIdx and forcing KindContent (which will yield
-		// empty results from an empty semantic pipeline when vec is nil).
 		return kind, nil, nil
 	}
 
@@ -89,7 +79,6 @@ func (a *App) classifyAndEmbed(raw string) (kind query.QueryKind, vec []float32,
 	return kind, vec, err
 }
 
-// blendedDTOs converts a slice of BlendedResult to a slice of SearchResultDTO.
 func blendedDTOs(results []search.BlendedResult) []SearchResultDTO {
 	dtos := make([]SearchResultDTO, len(results))
 	for i, r := range results {

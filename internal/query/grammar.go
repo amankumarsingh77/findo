@@ -26,18 +26,14 @@ var nowFunc = func() time.Time { return time.Now() }
 // It never panics and returns a best-effort result on malformed input.
 func Parse(input string) (spec FilterSpec) {
 	defer func() {
-		if r := recover(); r != nil {
-			// Return whatever we have so far.
-		}
+		_ = recover()
 		spec.Source = SourceGrammar
 	}()
 
 	now := nowFunc()
 	var semanticParts []string
 
-	// First, try to parse natural language patterns
 	if nlSpec, nlSemantic, ok := parseNaturalLanguage(input, now); ok {
-		// If we successfully parsed natural language patterns, merge with remaining semantic text
 		spec = nlSpec
 		if nlSemantic != "" {
 			spec.SemanticQuery = nlSemantic
@@ -51,7 +47,6 @@ func Parse(input string) (spec FilterSpec) {
 	n := len(runes)
 
 	for pos < n {
-		// Skip leading whitespace
 		for pos < n && unicode.IsSpace(runes[pos]) {
 			pos++
 		}
@@ -59,30 +54,27 @@ func Parse(input string) (spec FilterSpec) {
 			break
 		}
 
-		// Quoted phrase
 		if runes[pos] == '"' {
-			pos++ // consume opening quote
+			pos++
 			start := pos
 			for pos < n && runes[pos] != '"' {
 				pos++
 			}
 			phrase := string(runes[start:pos])
 			if pos < n {
-				pos++ // consume closing quote
+				pos++
 			}
 			semanticParts = append(semanticParts, phrase)
 			continue
 		}
 
-		// Negation: -term or -op:value
 		if runes[pos] == '-' && pos+1 < n && !unicode.IsSpace(runes[pos+1]) {
-			pos++ // consume '-'
+			pos++
 			start := pos
 			tok := readToken(runes, &pos)
 			if tok == "" {
 				continue
 			}
-			// Check if this is -op:value (e.g. -kind:image → MustNot file_type)
 			colonIdx := strings.IndexByte(tok, ':')
 			if colonIdx > 0 {
 				keyword := strings.ToLower(tok[:colonIdx])
@@ -100,7 +92,6 @@ func Parse(input string) (spec FilterSpec) {
 					}
 				}
 			}
-			// Plain -term → MustNot path contains
 			_ = start
 			spec.MustNot = append(spec.MustNot, Clause{
 				Field: FieldPath,
@@ -110,14 +101,12 @@ func Parse(input string) (spec FilterSpec) {
 			continue
 		}
 
-		// Read a token (up to whitespace)
 		start := pos
 		tok := readToken(runes, &pos)
 		if tok == "" {
 			continue
 		}
 
-		// Check if this looks like operator:value
 		colonIdx := strings.IndexByte(tok, ':')
 		if colonIdx > 0 {
 			keyword := strings.ToLower(tok[:colonIdx])
@@ -139,12 +128,10 @@ func Parse(input string) (spec FilterSpec) {
 					continue
 				}
 			}
-			// Not a recognized operator → free text
 			semanticParts = append(semanticParts, string(runes[start:pos]))
 			continue
 		}
 
-		// Plain free text token
 		semanticParts = append(semanticParts, tok)
 	}
 
@@ -192,9 +179,7 @@ func removeMatchedPhrase(text, phrase string) string {
 	before := text[:idx]
 	after := text[idx+len(phrase):]
 
-	// Strip one or more trailing filler connective words from `before`.
 	trimmedBefore := strings.TrimRight(before, " ")
-	// Try longest multi-word fillers first, then loop single-word ones.
 	multiWord := []string{
 		"created in the", "created in", "created on", "uploaded in", "uploaded on",
 		"modified in the", "modified in", "modified on",
@@ -213,7 +198,6 @@ func removeMatchedPhrase(text, phrase string) string {
 			break
 		}
 	}
-	// Strip up to 3 more trailing single-word fillers.
 	for i := 0; i < 3; i++ {
 		stripped := false
 		for _, filler := range singleWord {
@@ -230,7 +214,6 @@ func removeMatchedPhrase(text, phrase string) string {
 		}
 	}
 
-	// Strip a leading possessive "'s" from `after`.
 	after = strings.TrimLeft(after, " ")
 	if strings.HasPrefix(after, "'s ") || after == "'s" {
 		after = strings.TrimPrefix(after, "'s")
@@ -238,7 +221,6 @@ func removeMatchedPhrase(text, phrase string) string {
 	}
 
 	combined := strings.TrimSpace(trimmedBefore + " " + after)
-	// Collapse double spaces.
 	for strings.Contains(combined, "  ") {
 		combined = strings.ReplaceAll(combined, "  ", " ")
 	}
@@ -272,30 +254,26 @@ func readOpValue(runes []rune, pos *int, now time.Time) string {
 		return ""
 	}
 
-	// Quoted value
 	if runes[*pos] == '"' {
-		(*pos)++ // consume opening quote
+		(*pos)++
 		start := *pos
 		for *pos < n && runes[*pos] != '"' {
 			(*pos)++
 		}
 		val := string(runes[start:*pos])
 		if *pos < n {
-			(*pos)++ // consume closing quote
+			(*pos)++
 		}
 		return val
 	}
 
-	// Read first word
 	first := readToken(runes, pos)
 	if first == "" {
 		return ""
 	}
 
-	// Peek for a second word if the first is a known two-word date prefix
 	lower := strings.ToLower(first)
 	if twoWordDatePrefixes[lower] {
-		// Save position, try to read second word
 		savedPos := *pos
 		for *pos < n && unicode.IsSpace(runes[*pos]) {
 			(*pos)++
@@ -303,12 +281,10 @@ func readOpValue(runes []rune, pos *int, now time.Time) string {
 		second := readToken(runes, pos)
 		if second != "" {
 			candidate := first + " " + second
-			// Validate that the two-word phrase parses as a date
 			if _, _, ok := NormalizeDate(candidate, now); ok {
 				return candidate
 			}
 		}
-		// Not a valid two-word date — restore position, return just first word
 		*pos = savedPos
 	}
 
@@ -340,15 +316,12 @@ func parseKind(value string) ([]Clause, string, bool) {
 	if lower == "" {
 		return nil, "", false
 	}
-	// Direct lookup
 	if canonical, ok := KnownKindValues[lower]; ok {
 		return []Clause{{Field: FieldFileType, Op: OpEq, Value: canonical}}, "", true
 	}
-	// Typo correction
 	if canonical, ok := CorrectKind(lower); ok {
 		return []Clause{{Field: FieldFileType, Op: OpEq, Value: canonical}}, "", true
 	}
-	// Unknown kind value → fall through as semantic
 	return nil, "kind:" + value, false
 }
 
@@ -363,13 +336,10 @@ func parseExt(value string) ([]Clause, string, bool) {
 		if p == "" {
 			continue
 		}
-		// Strip leading dot for typo correction lookup.
 		bare := strings.TrimPrefix(p, ".")
-		// Typo correction: try to find closest known extension.
 		if corrected, ok := CorrectExtension(bare); ok {
 			exts = append(exts, "."+corrected)
 		} else {
-			// Unknown extension — keep as-is with leading dot.
 			if !strings.HasPrefix(p, ".") {
 				p = "." + p
 			}
@@ -402,10 +372,8 @@ func parseDateOp(direction, value string, now time.Time) ([]Clause, string, bool
 	var clauses []Clause
 	switch direction {
 	case "before":
-		// modified_at < start-of-day (afterT is the start-of-day boundary)
 		clauses = append(clauses, Clause{Field: FieldModifiedAt, Op: OpLt, Value: afterT})
 	case "after":
-		// modified_at >= start-of-day (afterT is the start-of-day boundary, includes the full day)
 		clauses = append(clauses, Clause{Field: FieldModifiedAt, Op: OpGte, Value: afterT})
 	}
 	return clauses, "", true

@@ -14,9 +14,9 @@ import (
 
 // Store wraps a SQLite database for file and chunk metadata.
 type Store struct {
-	db                 *sql.DB
-	logger             *slog.Logger
-	filenameFTSReady   bool // true when the filename_search FTS5 table exists
+	db               *sql.DB
+	logger           *slog.Logger
+	filenameFTSReady bool
 }
 
 // FileRecord represents a file tracked by the indexer.
@@ -31,9 +31,9 @@ type FileRecord struct {
 	ContentHash   string
 	ThumbnailPath string
 	// Derived columns — populated by migration 006 and maintained by UpsertFile/RenameFile.
-	Basename string // filename component (e.g. "report.pdf")
-	Parent   string // directory portion without trailing slash (e.g. "/docs")
-	Stem     string // basename minus last dot-extension (e.g. "report")
+	Basename string
+	Parent   string
+	Stem     string
 }
 
 // ChunkRecord represents a chunk of a file (e.g., a time segment of video/audio).
@@ -44,7 +44,7 @@ type ChunkRecord struct {
 	ChunkIndex     int
 	StartTime      float64
 	EndTime        float64
-	VectorBlob     []byte // optional: raw little-endian float32 vector stored inline
+	VectorBlob     []byte
 	EmbeddingModel string
 	EmbeddingDims  int
 }
@@ -56,9 +56,9 @@ type SearchResult struct {
 	VectorID       string
 	StartTime      float64
 	EndTime        float64
-	Distance       float32 // cosine distance from vectorstore (0=identical, 2=opposite)
-	FinalScore     float32 // reranked score (0–1+); set by search.Rerank, 0 if not reranked
-	EmbeddingModel string  // empty if the chunk predates migration 004
+	Distance       float32
+	FinalScore     float32
+	EmbeddingModel string
 }
 
 // NewStore opens the SQLite database at dsn, enables WAL mode and foreign keys,
@@ -138,7 +138,6 @@ func (s *Store) UpsertFile(f FileRecord) (int64, error) {
 		return 0, fmt.Errorf("last insert id: %w", err)
 	}
 
-	// On conflict update, LastInsertId may return 0. Query the actual ID.
 	if id == 0 {
 		err = s.db.QueryRow(`SELECT id FROM files WHERE path = ?`, f.Path).Scan(&id)
 		if err != nil {
@@ -776,7 +775,6 @@ func (s *Store) GetParsedQueryCache(normalizedQuery string, schemaVersion int) (
 		return "", fmt.Errorf("get parsed query cache: %w", err)
 	}
 
-	// Update last_used_at on hit.
 	_, _ = s.db.Exec(
 		`UPDATE parsed_query_cache SET last_used_at = ? WHERE query_text_normalized = ? AND schema_version = ?`,
 		time.Now().Unix(), normalizedQuery, schemaVersion,
@@ -860,7 +858,6 @@ func BlobToVec(blob []byte) ([]float32, error) {
 	return vec, nil
 }
 
-// blobToVec is an internal alias kept for callers within this package.
 func blobToVec(blob []byte) ([]float32, error) { return BlobToVec(blob) }
 
 // ModelsInIndex returns the distinct embedding_model values currently stored

@@ -106,13 +106,11 @@ func TestClassify_KnownCodes(t *testing.T) {
 		err  error
 		want Classification
 	}{
-		// Permanent
 		{ErrUnsupportedFormat, ClassPermanent},
 		{ErrExtractionFailed, ClassPermanent},
 		{ErrFileTooLarge, ClassPermanent},
 		{ErrFileUnreadable, ClassPermanent},
 		{ErrEmbedCountMismatch, ClassPermanent},
-		// TransientRetry
 		{ErrEmbedFailed, ClassTransientRetry},
 		{ErrHnswAdd, ClassTransientRetry},
 		{ErrStoreWrite, ClassTransientRetry},
@@ -248,12 +246,10 @@ func TestErrorsIs_As_Preserved(t *testing.T) {
 	cause := errors.New("root cause")
 	wrapped := Wrap("ERR_HNSW_ADD", "hnsw add failed", cause)
 
-	// errors.Is should find the cause.
 	if !errors.Is(wrapped, cause) {
 		t.Error("errors.Is did not find wrapped cause through apperr.Error")
 	}
 
-	// errors.As should extract *Error.
 	var appErr *Error
 	if !errors.As(wrapped, &appErr) {
 		t.Fatal("errors.As did not extract *apperr.Error")

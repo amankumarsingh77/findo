@@ -90,7 +90,6 @@ describe('splitHighlights', () => {
   });
 
   it('clamps out-of-bounds start', () => {
-    // start > textLen: the range is degenerate after clamping
     const result = splitHighlights('hello', [{ start: 10, end: 20 }]);
     expect(result).toEqual([{ text: 'hello', matched: false }]);
   });

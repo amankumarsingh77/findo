@@ -43,7 +43,6 @@ func TestSeedDefaultIgnorePatterns_SeedsOnEmptyDB(t *testing.T) {
 func TestSeedDefaultIgnorePatterns_SkipsIfPatternsExist(t *testing.T) {
 	a := newTestApp(t)
 
-	// Add one pattern before seeding.
 	if err := a.store.AddExcludedPattern("mypattern"); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +124,6 @@ func TestGetFilePreview_TruncatesAtMaxBytes(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "large.txt")
 
-	// Write more than 8192 bytes of text
 	data := make([]byte, 10000)
 	for i := range data {
 		data[i] = 'a'
@@ -148,7 +146,6 @@ func TestGetFilePreview_RejectsBinaryFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "binary.bin")
 
-	// Write bytes with a null byte (binary)
 	data := []byte{'h', 'e', 'l', 'l', 'o', 0, 'w', 'o', 'r', 'l', 'd'}
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		t.Fatal(err)
@@ -189,7 +186,6 @@ func TestGetFilePreview_RejectsInvalidUTF8(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "invalid.txt")
 
-	// Write invalid UTF-8 sequence (not a null byte, so passes binary check first)
 	data := []byte{0xff, 0xfe, 'h', 'e', 'l', 'l', 'o'}
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		t.Fatal(err)
@@ -201,7 +197,6 @@ func TestGetFilePreview_RejectsInvalidUTF8(t *testing.T) {
 	}
 }
 
-// TestSearchResultDTO_HasScoreField is a compile-time check that Score field exists.
 func TestSearchResultDTO_HasScoreField(t *testing.T) {
 	dto := SearchResultDTO{
 		Score: 0.95,
@@ -211,9 +206,6 @@ func TestSearchResultDTO_HasScoreField(t *testing.T) {
 	}
 }
 
-// newTestPipeline returns a minimal Pipeline wired to the given store.
-// The pipeline has no embedder (nil) — sufficient for SubmitFolder which only
-// enqueues work; actual file processing would fail but is not exercised here.
 func newTestPipeline(t *testing.T, s *store.Store) *indexer.Pipeline {
 	t.Helper()
 	idx := vectorstore.NewDefaultIndex(slog.Default())
@@ -222,8 +214,6 @@ func newTestPipeline(t *testing.T, s *store.Store) *indexer.Pipeline {
 	return p
 }
 
-// TestGetHotkeyString_ReturnsNonEmpty verifies that GetHotkeyString returns a
-// non-empty string when the store has no saved hotkey (uses the platform default).
 func TestGetHotkeyString_ReturnsNonEmpty(t *testing.T) {
 	a := newTestApp(t)
 	got := a.GetHotkeyString()
@@ -232,7 +222,6 @@ func TestGetHotkeyString_ReturnsNonEmpty(t *testing.T) {
 	}
 }
 
-// TestGetHotkeyString_CustomHotkey verifies that a stored hotkey is reflected in the output.
 func TestGetHotkeyString_CustomHotkey(t *testing.T) {
 	a := newTestApp(t)
 	if err := a.store.SetSetting("global_hotkey", "ctrl+shift+space"); err != nil {
@@ -248,16 +237,11 @@ func TestGetHotkeyString_CustomHotkey(t *testing.T) {
 	}
 }
 
-// TestReindexFolder_NilStore — REQ-001
-// When the store is nil ReindexFolder must return without panicking.
 func TestReindexFolder_NilStore(t *testing.T) {
 	a := &App{store: nil, pipeline: nil, logger: slog.Default()}
-	// Should not panic.
 	a.ReindexFolder("/some/path")
 }
 
-// TestReindexFolder_NilPipeline — REQ-001
-// When the pipeline is nil ReindexFolder must return without panicking.
 func TestReindexFolder_NilPipeline(t *testing.T) {
 	s, err := store.NewStore(":memory:", slog.Default())
 	if err != nil {
@@ -266,12 +250,9 @@ func TestReindexFolder_NilPipeline(t *testing.T) {
 	defer s.Close()
 
 	a := &App{store: s, pipeline: nil, logger: slog.Default()}
-	// Should not panic.
 	a.ReindexFolder("/some/path")
 }
 
-// TestReindexFolder_Success — REQ-001, REQ-002
-// Happy path: store has patterns, pipeline is valid — must not panic.
 func TestReindexFolder_Success(t *testing.T) {
 	s, err := store.NewStore(":memory:", slog.Default())
 	if err != nil {
@@ -279,7 +260,6 @@ func TestReindexFolder_Success(t *testing.T) {
 	}
 	defer s.Close()
 
-	// Seed a couple of exclude patterns.
 	for _, p := range []string{"node_modules", ".git"} {
 		if err := s.AddExcludedPattern(p); err != nil {
 			t.Fatal(err)
@@ -288,12 +268,9 @@ func TestReindexFolder_Success(t *testing.T) {
 
 	p := newTestPipeline(t, s)
 	a := &App{store: s, pipeline: p, logger: slog.Default()}
-	// Should not panic and should submit the folder.
 	a.ReindexFolder("/any/folder")
 }
 
-// TestReindexFolder_StoreError_DoesNotPanic — EDGE-004
-// When GetExcludedPatterns fails (closed store) ReindexFolder must not panic.
 func TestReindexFolder_StoreError_DoesNotPanic(t *testing.T) {
 	s, err := store.NewStore(":memory:", slog.Default())
 	if err != nil {
@@ -303,15 +280,10 @@ func TestReindexFolder_StoreError_DoesNotPanic(t *testing.T) {
 	p := newTestPipeline(t, s)
 	a := &App{store: s, pipeline: p, logger: slog.Default()}
 
-	// Close the store so all DB calls return an error.
 	s.Close()
-	// Should not panic.
 	a.ReindexFolder("/any/folder")
 }
 
-// TestReindexFolder_NonExistentPath — REQ-006 / EDGE-003
-// Passing a path that does not exist on disk must not panic —
-// the pipeline handles non-existent paths gracefully during processing.
 func TestReindexFolder_NonExistentPath(t *testing.T) {
 	s, err := store.NewStore(":memory:", slog.Default())
 	if err != nil {
@@ -321,12 +293,9 @@ func TestReindexFolder_NonExistentPath(t *testing.T) {
 
 	p := newTestPipeline(t, s)
 	a := &App{store: s, pipeline: p, logger: slog.Default()}
-	// Should not panic.
 	a.ReindexFolder("/does/not/exist/at/all")
 }
 
-// TestDetectMissingVectorBlobs_False — Phase 3
-// On an empty store, DetectMissingVectorBlobs must return false.
 func TestDetectMissingVectorBlobs_False(t *testing.T) {
 	a := newTestApp(t)
 
@@ -336,7 +305,6 @@ func TestDetectMissingVectorBlobs_False(t *testing.T) {
 	}
 }
 
-// newTestAppWithCache returns an App wired with a ParsedQueryCache.
 func newTestAppWithCache(t *testing.T) *App {
 	t.Helper()
 	s, err := store.NewStore(":memory:", slog.Default())
@@ -353,9 +321,6 @@ func newTestAppWithCache(t *testing.T) *App {
 	return a
 }
 
-// TestParseQuery_GrammarOnly — Phase 6
-// "kind:image beach" parses grammar-only (no LLM needed), returns at least one chip
-// with field="file_type" and semanticQuery="beach".
 func TestParseQuery_GrammarOnly(t *testing.T) {
 	a := newTestAppWithCache(t)
 
@@ -372,7 +337,6 @@ func TestParseQuery_GrammarOnly(t *testing.T) {
 	if len(result.Chips) == 0 {
 		t.Error("expected at least one chip for kind:image filter")
 	}
-	// Find the file_type chip
 	var found bool
 	for _, c := range result.Chips {
 		if c.Field == "file_type" {
@@ -387,8 +351,6 @@ func TestParseQuery_GrammarOnly(t *testing.T) {
 	}
 }
 
-// TestParseQuery_Disabled — Phase 6
-// When nl_query_enabled=false, ParseQuery returns an empty result without error.
 func TestParseQuery_Disabled(t *testing.T) {
 	a := newTestAppWithCache(t)
 	if err := a.store.SetSetting("nl_query_enabled", "false"); err != nil {
@@ -407,22 +369,12 @@ func TestParseQuery_Disabled(t *testing.T) {
 	}
 }
 
-// TestSearchWithFilters_NoSpec — Phase 6
-// With an empty raw query, SearchWithFilters returns no error (falls back gracefully).
 func TestSearchWithFilters_NoSpec(t *testing.T) {
 	a := newTestAppWithCache(t)
-	// No embedder, but with an empty query that won't reach vector search.
-	// This tests that we get a graceful path when embedder is nil.
 	_, err := a.SearchWithFilters("", "", nil)
-	// With nil embedder, it falls back to Search("") which returns nil,nil.
-	// Accept either nil error or specific embedder error.
 	_ = err // we just confirm it doesn't panic
 }
 
-// TestBuildChipDTOs_FileType — Phase 6
-// file_type=image clause must yield a chip with label "Images",
-// field="file_type", op="eq", value="image",
-// and clauseKey="file_type|eq|image".
 func TestBuildChipDTOs_FileType(t *testing.T) {
 	spec := query.FilterSpec{
 		Must: []query.Clause{
@@ -451,8 +403,6 @@ func TestBuildChipDTOs_FileType(t *testing.T) {
 	}
 }
 
-// TestBuildChipDTOs_ModifiedAt — Phase 6
-// modified_at >= date should produce a chip with label starting "Since".
 func TestBuildChipDTOs_ModifiedAt(t *testing.T) {
 	date := time.Date(2026, 4, 5, 0, 0, 0, 0, time.UTC)
 	spec := query.FilterSpec{
@@ -469,8 +419,6 @@ func TestBuildChipDTOs_ModifiedAt(t *testing.T) {
 	}
 }
 
-// TestBuildChipDTOs_Extension — Phase 6
-// extension IN [.py,.go] should produce a chip with label containing ".py" and ".go".
 func TestBuildChipDTOs_Extension(t *testing.T) {
 	spec := query.FilterSpec{
 		Must: []query.Clause{
@@ -486,8 +434,6 @@ func TestBuildChipDTOs_Extension(t *testing.T) {
 	}
 }
 
-// TestBuildChipDTOs_SizeBytes — Phase 6
-// size_bytes > 10485760 should produce a chip with label "> 10 MB".
 func TestBuildChipDTOs_SizeBytes(t *testing.T) {
 	spec := query.FilterSpec{
 		Must: []query.Clause{
@@ -503,8 +449,6 @@ func TestBuildChipDTOs_SizeBytes(t *testing.T) {
 	}
 }
 
-// TestBuildChipDTOs_MustNotPrefixesNot — Phase 6
-// MustNot clause should prefix the label with "Not ".
 func TestBuildChipDTOs_MustNotPrefixesNot(t *testing.T) {
 	spec := query.FilterSpec{
 		MustNot: []query.Clause{
@@ -520,13 +464,9 @@ func TestBuildChipDTOs_MustNotPrefixesNot(t *testing.T) {
 	}
 }
 
-// TestParseQuery_CacheHit — Phase 6
-// A second call with the same query (after the first populates the cache) should
-// return CacheHit=true.
 func TestParseQuery_CacheHit(t *testing.T) {
 	a := newTestAppWithCache(t)
 
-	// Manually prime the cache with a known spec.
 	spec := query.FilterSpec{
 		SemanticQuery: "beach",
 		Must: []query.Clause{
@@ -550,14 +490,8 @@ func TestParseQuery_CacheHit(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Phase 7: Offline Mode tests (NLQ-120, NLQ-121)
-// ---------------------------------------------------------------------------
-
-// TestOfflineMode_SkipsLLM — no API key → ParseQuery returns IsOffline=true, no error.
 func TestOfflineMode_SkipsLLM(t *testing.T) {
 	a := newTestAppWithCache(t)
-	// No embedder set (offline mode)
 	result, err := a.ParseQuery("kind:image beach")
 	if err != nil {
 		t.Fatalf("ParseQuery returned error in offline mode: %v", err)
@@ -565,17 +499,13 @@ func TestOfflineMode_SkipsLLM(t *testing.T) {
 	if !result.IsOffline {
 		t.Error("expected IsOffline=true when embedder is nil")
 	}
-	// Grammar should still run and produce chips
 	if len(result.Chips) == 0 {
 		t.Error("expected chips from grammar parse even in offline mode")
 	}
 }
 
-// TestOfflineMode_SearchReturnsFilenameResults — offline + SearchWithFilters
-// falls back to filename-contains search.
 func TestOfflineMode_SearchReturnsFilenameResults(t *testing.T) {
 	a := newTestAppWithCache(t)
-	// Insert a file record so SearchFilenameContains can find it.
 	_, err := a.store.UpsertFile(store.FileRecord{
 		Path:       "/home/user/documents/report.pdf",
 		FileType:   "document",
@@ -591,7 +521,6 @@ func TestOfflineMode_SearchReturnsFilenameResults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchWithFilters returned error in offline mode: %v", err)
 	}
-	// Should contain at least the report.pdf file
 	found := false
 	for _, r := range result.Results {
 		if strings.Contains(r.FilePath, "report") {
@@ -603,11 +532,6 @@ func TestOfflineMode_SearchReturnsFilenameResults(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Phase 7: NL Query Enabled toggle tests (NLQ-133)
-// ---------------------------------------------------------------------------
-
-// TestNLQueryEnabled_DefaultTrue — no setting → GetNLQueryEnabled returns true.
 func TestNLQueryEnabled_DefaultTrue(t *testing.T) {
 	a := newTestAppWithCache(t)
 	if !a.GetNLQueryEnabled() {
@@ -615,7 +539,6 @@ func TestNLQueryEnabled_DefaultTrue(t *testing.T) {
 	}
 }
 
-// TestNLQueryEnabled_CanBeDisabled — SetNLQueryEnabled(false) persists and is read back.
 func TestNLQueryEnabled_CanBeDisabled(t *testing.T) {
 	a := newTestAppWithCache(t)
 	if err := a.SetNLQueryEnabled(false); err != nil {
@@ -624,7 +547,6 @@ func TestNLQueryEnabled_CanBeDisabled(t *testing.T) {
 	if a.GetNLQueryEnabled() {
 		t.Error("expected GetNLQueryEnabled()=false after SetNLQueryEnabled(false)")
 	}
-	// ParseQuery should return empty result when disabled
 	result, err := a.ParseQuery("kind:image beach")
 	if err != nil {
 		t.Fatalf("ParseQuery returned error: %v", err)
@@ -634,7 +556,6 @@ func TestNLQueryEnabled_CanBeDisabled(t *testing.T) {
 	}
 }
 
-// TestGetNLQueryEnabled_CanBeEnabled — SetNLQueryEnabled(true) sets it back.
 func TestGetNLQueryEnabled_CanBeEnabled(t *testing.T) {
 	a := newTestAppWithCache(t)
 	if err := a.SetNLQueryEnabled(false); err != nil {
@@ -648,11 +569,6 @@ func TestGetNLQueryEnabled_CanBeEnabled(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Phase 8: Observability + Settings + Startup Cache Eviction
-// ---------------------------------------------------------------------------
-
-// TestGetDebugStats_ReturnsMap — GetDebugStats returns a map with expected keys.
 func TestGetDebugStats_ReturnsMap(t *testing.T) {
 	a := newTestApp(t)
 	a.queryStats = &QueryStats{}
@@ -668,7 +584,6 @@ func TestGetDebugStats_ReturnsMap(t *testing.T) {
 	}
 }
 
-// TestGetDebugStats_ZeroInitial — before any calls, all counts are zero.
 func TestGetDebugStats_ZeroInitial(t *testing.T) {
 	a := newTestApp(t)
 	a.queryStats = &QueryStats{}
@@ -685,7 +600,6 @@ func TestGetDebugStats_ZeroInitial(t *testing.T) {
 	}
 }
 
-// TestBruteForceThreshold_DefaultWhenMissing — no setting → uses DefaultBruteForceThreshold.
 func TestBruteForceThreshold_DefaultWhenMissing(t *testing.T) {
 	a := newTestApp(t)
 
@@ -695,7 +609,6 @@ func TestBruteForceThreshold_DefaultWhenMissing(t *testing.T) {
 	}
 }
 
-// TestBruteForceThreshold_FromSettings — set "brute_force_threshold"="100" → returns 100.
 func TestBruteForceThreshold_FromSettings(t *testing.T) {
 	a := newTestApp(t)
 	if err := a.store.SetSetting("brute_force_threshold", "100"); err != nil {
@@ -708,7 +621,6 @@ func TestBruteForceThreshold_FromSettings(t *testing.T) {
 	}
 }
 
-// TestNeedsReindex_FalseWhenEmpty — empty store → NeedsReindex returns false.
 func TestNeedsReindex_FalseWhenEmpty(t *testing.T) {
 	a := newTestApp(t)
 

@@ -7,8 +7,6 @@ import (
 	"findo/internal/store"
 )
 
-// makeSemanticResult is a test helper that builds a store.SearchResult with
-// a given path and final score.
 func makeSemanticResult(path string, finalScore float32) store.SearchResult {
 	return store.SearchResult{
 		File:       store.FileRecord{Path: path},
@@ -17,7 +15,6 @@ func makeSemanticResult(path string, finalScore float32) store.SearchResult {
 	}
 }
 
-// makeFilenameHit is a test helper that builds a FilenameHit.
 func makeFilenameHit(path string, score float64, matchKind string) FilenameHit {
 	return FilenameHit{
 		File:      store.FileRecord{Path: path},
@@ -26,7 +23,6 @@ func makeFilenameHit(path string, score float64, matchKind string) FilenameHit {
 	}
 }
 
-// makeFilenameHitWithHighlights is a test helper that builds a FilenameHit with highlights.
 func makeFilenameHitWithHighlights(path string, score float64, matchKind string, highlights []HighlightRange) FilenameHit {
 	return FilenameHit{
 		File:       store.FileRecord{Path: path},
@@ -142,7 +138,6 @@ func TestBlend_KindHybrid_disjointPaths_interleavesByRRF(t *testing.T) {
 		t.Fatalf("expected 6 results (3+3 disjoint), got %d", len(got))
 	}
 
-	// Verify scores are in descending order.
 	for i := 1; i < len(got); i++ {
 		if got[i].Score > got[i-1].Score {
 			t.Errorf("results not sorted: got[%d].Score=%v > got[%d].Score=%v",
@@ -185,7 +180,6 @@ func TestBlend_KindHybrid_overlappingPath_deduped(t *testing.T) {
 }
 
 func TestBlend_KindHybrid_exactBoostOutranks(t *testing.T) {
-	// The exact-match filename hit should outscore a non-exact competing entry.
 	exactPath := "/proj/main.go"
 	otherPath := "/proj/util.go"
 
@@ -194,7 +188,7 @@ func TestBlend_KindHybrid_exactBoostOutranks(t *testing.T) {
 		makeSemanticResult(exactPath, 0.85), // rank 1 in semantic
 	}
 	filename := []FilenameHit{
-		makeFilenameHit(exactPath, 1.0, "exact"),    // rank 0 in filename + bonus
+		makeFilenameHit(exactPath, 1.0, "exact"),     // rank 0 in filename + bonus
 		makeFilenameHit(otherPath, 0.7, "substring"), // rank 1 in filename
 	}
 	cfg := DefaultBlendConfig()
@@ -204,8 +198,6 @@ func TestBlend_KindHybrid_exactBoostOutranks(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("expected 2 results, got %d", len(got))
 	}
-	// exactPath should be first: it gets semantic rank-1 RRF + filename rank-0 RRF + ExactBonus.
-	// otherPath gets semantic rank-0 RRF + filename rank-1 RRF (no bonus).
 	if got[0].File.Path != exactPath {
 		t.Errorf("top result = %q, want %q (exact-match boosted)", got[0].File.Path, exactPath)
 	}
@@ -362,7 +354,6 @@ func TestBlend_KindHybrid_kCapRespected(t *testing.T) {
 }
 
 func TestBlend_KindHybrid_determinism(t *testing.T) {
-	// Same input must always produce the same output (stable sort).
 	semantic := []store.SearchResult{
 		makeSemanticResult("/s/a.txt", 0.9),
 		makeSemanticResult("/s/b.txt", 0.7),
@@ -392,7 +383,6 @@ func TestBlend_KindHybrid_determinism(t *testing.T) {
 }
 
 func TestBlend_KindHybrid_exactBoostAddsBonus(t *testing.T) {
-	// Verify exact bonus is numerically applied.
 	exactPath := "/dir/exact.go"
 	cfg := DefaultBlendConfig()
 

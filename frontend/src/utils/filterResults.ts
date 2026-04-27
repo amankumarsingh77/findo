@@ -8,7 +8,7 @@ function evaluateStringOp(fieldVal: string, op: string, value: string): boolean 
     case 'eq':       return fieldVal === value
     case 'neq':      return fieldVal !== value
     case 'contains': return fieldVal.toLowerCase().includes(value.toLowerCase())
-    default:         return true // unknown op — don't filter
+    default:         return true
   }
 }
 
@@ -20,15 +20,10 @@ function evaluateNumericOp(fieldVal: number, op: string, threshold: number): boo
     case 'gte': return fieldVal >= threshold
     case 'lt':  return fieldVal < threshold
     case 'lte': return fieldVal <= threshold
-    default:    return true // unknown op — don't filter
+    default:    return true
   }
 }
 
-/**
- * Evaluates a single chip predicate against one result.
- * Returns true if the result satisfies the predicate.
- * must_not chips negate the predicate.
- */
 function evaluateChip(result: SearchResultDTO, chip: ChipDTO): boolean {
   const { field, op, value, clauseType } = chip
   const negate = clauseType === 'must_not'
@@ -57,7 +52,6 @@ function evaluateChip(result: SearchResultDTO, chip: ChipDTO): boolean {
     }
 
     case 'modified_at': {
-      // Both chip value and result.modifiedAt are Unix seconds
       const threshold = parseInt(value, 10)
       if (isNaN(threshold)) return true
       passes = evaluateNumericOp(result.modifiedAt, op, threshold)

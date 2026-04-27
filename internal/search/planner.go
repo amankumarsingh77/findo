@@ -158,7 +158,6 @@ func (p *Planner) Plan(queryVec []float32, spec query.FilterSpec, k int) ([]stor
 		return nil, "hnsw_post_filter", count, err
 	}
 
-	// Build allowed file ID set.
 	fileIDs, err := p.store.FilterFileIDs(storeSpec)
 	if err != nil {
 		return nil, "hnsw_post_filter", count, err
@@ -168,7 +167,6 @@ func (p *Planner) Plan(queryVec []float32, spec query.FilterSpec, k int) ([]stor
 		allowedIDs[id] = true
 	}
 
-	// Extract vector IDs from HNSW results and fetch metadata.
 	vectorIDs := make([]string, len(hnswResults))
 	for i, r := range hnswResults {
 		vectorIDs[i] = r.ID
@@ -178,7 +176,6 @@ func (p *Planner) Plan(queryVec []float32, spec query.FilterSpec, k int) ([]stor
 		return nil, "hnsw_post_filter", count, err
 	}
 
-	// Build distance map.
 	distMap := make(map[string]float32, len(hnswResults))
 	for _, r := range hnswResults {
 		distMap[r.ID] = r.Distance
@@ -187,7 +184,6 @@ func (p *Planner) Plan(queryVec []float32, spec query.FilterSpec, k int) ([]stor
 		chunks[i].Distance = distMap[chunks[i].VectorID]
 	}
 
-	// Filter by allowed file IDs and deduplicate by file path (best chunk per file).
 	best := make(map[int64]store.SearchResult)
 	for _, r := range chunks {
 		if !allowedIDs[r.File.ID] {
@@ -238,13 +234,11 @@ func (p *Planner) joinHNSWResults(hnswResults []vectorstore.SearchResult, k int)
 		chunks[i].Distance = distMap[chunks[i].VectorID]
 	}
 
-	// Build lookup by vectorID.
 	byVecID := make(map[string]store.SearchResult, len(chunks))
 	for _, r := range chunks {
 		byVecID[r.VectorID] = r
 	}
 
-	// Deduplicate by file path, keeping best distance.
 	best := make(map[string]store.SearchResult)
 	for _, id := range vectorIDs {
 		r, ok := byVecID[id]
@@ -257,7 +251,6 @@ func (p *Planner) joinHNSWResults(hnswResults []vectorstore.SearchResult, k int)
 		}
 	}
 
-	// Re-traverse HNSW order to emit in rank order, capped at k.
 	emitted := make(map[string]bool)
 	var deduped []store.SearchResult
 	for _, id := range vectorIDs {

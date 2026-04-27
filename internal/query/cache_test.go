@@ -57,7 +57,6 @@ func TestReadSkipsOldVersions(t *testing.T) {
 	s := newTestStore(t)
 	cache := NewParsedQueryCache(s)
 
-	// Seed a row directly at schema_version=0 (the old default).
 	db := store.DBForTesting(s)
 	_, err := db.Exec(
 		`INSERT INTO parsed_query_cache (query_text_normalized, spec_json, schema_version, created_at, last_used_at)
@@ -85,7 +84,6 @@ func TestReadWithMixedVersions(t *testing.T) {
 
 	db := store.DBForTesting(s)
 
-	// Seed v0 row first (old cache entry).
 	_, err := db.Exec(
 		`INSERT INTO parsed_query_cache (query_text_normalized, spec_json, schema_version, created_at, last_used_at)
 		 VALUES (?, ?, 0, strftime('%s','now'), strftime('%s','now'))`,
@@ -95,7 +93,6 @@ func TestReadWithMixedVersions(t *testing.T) {
 		t.Fatalf("seed v0 row: %v", err)
 	}
 
-	// Now write v2 row via the cache (INSERT OR REPLACE replaces on primary key).
 	spec := FilterSpec{SemanticQuery: "photos from yesterday"}
 	if err := cache.Set("photos from yesterday", spec); err != nil {
 		t.Fatalf("Set v2 row: %v", err)
@@ -122,12 +119,10 @@ func TestEvictOldParsedQueryCache_StillWorks(t *testing.T) {
 	s := newTestStore(t)
 	cache := NewParsedQueryCache(s)
 
-	// Write a current entry.
 	if err := cache.Set("recent query", FilterSpec{SemanticQuery: "recent"}); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
 
-	// Seed an old entry by direct SQL with an old timestamp.
 	db := store.DBForTesting(s)
 	oldTS := int64(0) // Unix epoch — definitely older than 30 days
 	_, err := db.Exec(

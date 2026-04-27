@@ -131,14 +131,12 @@ func newTestPipeline(t *testing.T, onDone func()) (*Pipeline, *store.Store, *vec
 func TestIndexFile_SkipsUnchangedFile(t *testing.T) {
 	p, s, _ := newTestPipeline(t, nil)
 
-	// Create a real file on disk.
 	dir := t.TempDir()
 	filePath := dir + "/hello.txt"
 	if err := os.WriteFile(filePath, []byte("hello world"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	// Compute its real hash and store it as fully indexed.
 	hash, err := hashFile(filePath)
 	if err != nil {
 		t.Fatal(err)
@@ -157,7 +155,6 @@ func TestIndexFile_SkipsUnchangedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// indexFile should skip (return nil) since hash matches.
 	if err := p.indexFile(p.ctx, filePath, false); err != nil {
 		t.Fatalf("expected nil (skip), got: %v", err)
 	}
@@ -190,7 +187,6 @@ func TestIndexFile_ReindexesFileWithEmptyHash(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Should NOT skip. With nil embedder it should fail with "embedder not initialized".
 	err = p.indexFile(p.ctx, filePath, false)
 	if err == nil {
 		t.Fatal("expected an error (embedder not initialized), got nil")
@@ -263,7 +259,6 @@ func TestIndexFile_UpdateContentHash(t *testing.T) {
 	}
 	info, _ := os.Stat(filePath)
 
-	// Phase 1: insert with empty hash
 	fileID, err := s.UpsertFile(store.FileRecord{
 		Path:        filePath,
 		FileType:    "text",
@@ -279,7 +274,6 @@ func TestIndexFile_UpdateContentHash(t *testing.T) {
 
 	realHash, _ := hashFile(filePath)
 
-	// Phase 2 (simulate success): call UpdateContentHash
 	if err := s.UpdateContentHash(fileID, realHash); err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +308,6 @@ func TestIndexFile_DoesNotUpdateHashIfChunkFails(t *testing.T) {
 		t.Fatal("expected error from nil embedder")
 	}
 
-	// The file should be in the store with empty content_hash.
 	rec, dbErr := s.GetFileByPath(filePath)
 	if dbErr != nil {
 		t.Fatalf("file should be in store after failed indexFile, got: %v", dbErr)
@@ -334,7 +327,6 @@ func TestPipeline_ChunksSinceLastSave_FieldExists(t *testing.T) {
 	if initial != 0 {
 		t.Fatalf("expected chunksSinceLastSave=0 on new pipeline, got %d", initial)
 	}
-	// p.saveEveryN constant must equal 50.
 	if p.saveEveryN != 50 {
 		t.Fatalf("expected p.saveEveryN=50, got %d", p.saveEveryN)
 	}
@@ -353,7 +345,6 @@ func TestPipeline_PeriodicSave_OnJobDoneCalledAtSaveInterval(t *testing.T) {
 	p.chunksSinceLastSave = p.saveEveryN - 1
 	p.mu.Unlock()
 
-	// One more chunk pushes it to p.saveEveryN.
 	p.mu.Lock()
 	p.chunksSinceLastSave++
 	shouldSave := p.chunksSinceLastSave >= p.saveEveryN
@@ -370,7 +361,6 @@ func TestPipeline_PeriodicSave_OnJobDoneCalledAtSaveInterval(t *testing.T) {
 		t.Fatalf("expected onJobDone called 1 time at p.saveEveryN, got %d", calls)
 	}
 
-	// Counter must have reset.
 	p.mu.Lock()
 	counter := p.chunksSinceLastSave
 	p.mu.Unlock()
@@ -386,7 +376,6 @@ func TestPipeline_PeriodicSave_NotCalledBeforeSaveInterval(t *testing.T) {
 	onDone := func() { calls++ }
 	p, _, _ := newTestPipeline(t, onDone)
 
-	// Simulate 49 chunks (one short of threshold).
 	for i := 0; i < p.saveEveryN-1; i++ {
 		p.mu.Lock()
 		p.chunksSinceLastSave++
@@ -410,7 +399,6 @@ func TestPipeline_PeriodicSave_NotCalledBeforeSaveInterval(t *testing.T) {
 func TestResetStatus(t *testing.T) {
 	p, _, _ := newTestPipeline(t, nil)
 
-	// Simulate counters being incremented by a previous run.
 	p.mu.Lock()
 	p.status.TotalFiles = 42
 	p.status.IndexedFiles = 38
@@ -435,13 +423,11 @@ func TestResetStatus(t *testing.T) {
 	}
 }
 
-// TestSetEmbedder_NilEmbedder — Phase 1 Task 1
-// A pipeline created with nil embedder, after SetEmbedder(nil), must fail
-// indexFile with "embedder not initialized" error.
+// TestSetEmbedder_NilEmbedder verifies a pipeline created with nil embedder,
+// after SetEmbedder(nil), fails indexFile with an embedder-not-initialized error.
 func TestSetEmbedder_NilEmbedder(t *testing.T) {
 	p, _, _ := newTestPipeline(t, nil)
 
-	// Start with nil, then explicitly set nil again via SetEmbedder.
 	p.SetEmbedder(nil)
 
 	dir := t.TempDir()
@@ -459,19 +445,15 @@ func TestSetEmbedder_NilEmbedder(t *testing.T) {
 	}
 }
 
-// TestSetEmbedder_ReplaceEmbedder — Phase 1 Task 1
-// SetEmbedder must replace the pipeline's embedder field.
-// We verify by calling SetEmbedder with a non-nil embedder and confirming
-// the struct field is updated (checked via the exported method).
+// TestSetEmbedder_ReplaceEmbedder verifies SetEmbedder replaces the
+// pipeline's embedder field.
 func TestSetEmbedder_ReplaceEmbedder(t *testing.T) {
 	p, _, _ := newTestPipeline(t, nil)
 
-	// Pipeline starts with nil embedder.
 	if p.embedder != nil {
 		t.Fatal("expected nil embedder initially")
 	}
 
-	// Create a real *embedder.Embedder with a fake key — no real API calls made.
 	emb, err := embedder.NewEmbedder("fake-key-for-test", 768, testLogger())
 	if err != nil {
 		t.Fatalf("NewEmbedder with fake key: %v", err)
@@ -479,7 +461,6 @@ func TestSetEmbedder_ReplaceEmbedder(t *testing.T) {
 
 	p.SetEmbedder(emb)
 
-	// Confirm the field was replaced.
 	p.embedderMu.RLock()
 	got := p.embedder
 	p.embedderMu.RUnlock()
@@ -492,9 +473,6 @@ func TestSetEmbedder_ReplaceEmbedder(t *testing.T) {
 	}
 }
 
-// TestIndexFile_ForceBypassesHashCheck
-// force=true on a file with matching hash → does NOT skip (returns "embedder not initialized")
-// force=false on a file with matching hash → skips (returns nil)
 func TestIndexFile_ForceBypassesHashCheck(t *testing.T) {
 	p, s, _ := newTestPipeline(t, nil)
 
@@ -522,12 +500,10 @@ func TestIndexFile_ForceBypassesHashCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// force=false: should skip (return nil)
 	if err := p.indexFile(p.ctx, filePath, false); err != nil {
 		t.Fatalf("force=false: expected nil (skip), got: %v", err)
 	}
 
-	// force=true: should NOT skip → hits embedder nil → "embedder not initialized"
 	err = p.indexFile(p.ctx, filePath, true)
 	if err == nil {
 		t.Fatal("force=true: expected error (not skipped), got nil")
@@ -537,8 +513,6 @@ func TestIndexFile_ForceBypassesHashCheck(t *testing.T) {
 	}
 }
 
-// TestSubmitFolder_ForceFieldPropagated
-// SubmitFolder with force=true → job in jobCh has force=true
 func TestSubmitFolder_ForceFieldPropagated(t *testing.T) {
 	p, _, _ := newTestPipeline(t, nil)
 
@@ -554,8 +528,6 @@ func TestSubmitFolder_ForceFieldPropagated(t *testing.T) {
 	}
 }
 
-// TestResetStatus_IncrementsGeneration
-// ResetStatus must increment the generation counter each call
 func TestResetStatus_IncrementsGeneration(t *testing.T) {
 	p, _, _ := newTestPipeline(t, nil)
 
@@ -573,8 +545,6 @@ func TestResetStatus_IncrementsGeneration(t *testing.T) {
 	}
 }
 
-// TestSetTotalFiles_SetsCountAndRunning
-// SetTotalFiles must set TotalFiles to the given value and mark IsRunning=true.
 func TestSetTotalFiles_SetsCountAndRunning(t *testing.T) {
 	p, _, _ := newTestPipeline(t, nil)
 
@@ -595,22 +565,18 @@ func TestProcessFolder_ForceDoesNotAccumulateTotalFiles(t *testing.T) {
 	p, _, _ := newTestPipeline(t, nil)
 
 	dir := t.TempDir()
-	// Create 2 text files.
 	for _, name := range []string{"a.txt", "b.txt"} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte("content"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	// Pre-set TotalFiles to 2 (as ReindexNow would do).
 	p.SetTotalFiles(2)
 
-	// Run processFolder with force=true directly (no worker goroutine).
-	// It will fail at embedding (nil embedder) but that's fine — we just need it to run.
+	// It will fail at embedding (nil embedder), but status totals are updated first.
 	p.processFolder(dir, nil, true)
 
 	s := p.Status()
-	// TotalFiles should still be 2, not 4 (2+2).
 	if s.TotalFiles != 2 {
 		t.Fatalf("expected TotalFiles=2 (pre-set, not doubled), got %d", s.TotalFiles)
 	}
@@ -628,7 +594,6 @@ func TestProcessFolder_NonForceAccumulates(t *testing.T) {
 		}
 	}
 
-	// TotalFiles starts at 0.
 	p.processFolder(dir, nil, false)
 
 	s := p.Status()
@@ -637,13 +602,12 @@ func TestProcessFolder_NonForceAccumulates(t *testing.T) {
 	}
 }
 
-// TestSetEmbedder_Race — Phase 1 Task 1
-// Concurrent SetEmbedder calls while the pipeline worker goroutine is idle
-// must not produce a data race. Run with: go test -race ./internal/indexer/...
+// TestSetEmbedder_Race verifies concurrent SetEmbedder calls while the
+// pipeline worker goroutine is idle do not produce a data race.
+// Run with: go test -race ./internal/indexer/...
 func TestSetEmbedder_Race(t *testing.T) {
 	p, _, _ := newTestPipeline(t, nil)
 
-	// Start the worker goroutine (mirrors NewPipeline behaviour).
 	p.workerWg.Add(1)
 	go p.worker()
 
@@ -722,13 +686,11 @@ func TestPipeline_WorkerPool_StartsNWorkers(t *testing.T) {
 	mock := &mockEmbedder{}
 	p, _, _ := newTestPipelineWithMock(t, mock, func() {}, 4)
 
-	// Submit all 4 jobs.
 	for i := 0; i < numFiles; i++ {
 		fpath := filepath.Join(dir, fmt.Sprintf("file%d.txt", i))
 		p.SubmitFile(fpath)
 	}
 
-	// Wait until all 4 EmbedBatch calls are made (with timeout).
 	deadline := time.After(5 * time.Second)
 	for {
 		mock.mu.Lock()
@@ -755,7 +717,6 @@ func TestIndexFile_UsesBatchEmbedding(t *testing.T) {
 	p, _, _ := newTestPipelineWithMock(t, mock, nil, 1)
 
 	dir := t.TempDir()
-	// Write a file large enough to produce multiple chunks.
 	content := strings.Repeat("This is a sentence for testing batch embedding purposes. ", 200)
 	filePath := filepath.Join(dir, "big.txt")
 	if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
@@ -840,19 +801,15 @@ func TestIndexFile_GenerationCancelMidBatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Run indexFile in a goroutine; it will block inside EmbedBatch.
 	done := make(chan error, 1)
 	go func() {
 		done <- p.indexFile(p.ctx, filePath, true)
 	}()
 
-	// Wait a moment for indexFile to reach EmbedBatch (it will be blocked).
 	time.Sleep(50 * time.Millisecond)
 
-	// Advance the generation counter (simulates a new reindex being triggered).
 	p.generation.Add(1)
 
-	// Unblock EmbedBatch.
 	close(blockCh)
 
 	err := <-done
@@ -872,13 +829,11 @@ func TestIndexFile_GenerationCancelMidBatch(t *testing.T) {
 	}
 }
 
-// TestPipeline_QuotaResumeAt_SetOnPause — Phase 3
-// When the pipeline enters quota pause, QuotaResumeAt must be non-zero in status.
-// When the pause clears, QuotaResumeAt must reset to zero string.
+// TestPipeline_QuotaResumeAt_SetOnPause verifies QuotaResumeAt is non-zero
+// in status during quota pause and resets to zero when the pause clears.
 func TestPipeline_QuotaResumeAt_SetOnPause(t *testing.T) {
 	p, _, _ := newTestPipeline(t, nil)
 
-	// Simulate the rate limiter being paused for 60 seconds.
 	resumeAt := time.Now().Add(60 * time.Second)
 	p.mu.Lock()
 	p.status.QuotaPaused = true
@@ -901,7 +856,6 @@ func TestPipeline_QuotaResumeAt_SetOnPause(t *testing.T) {
 		t.Fatal("QuotaResumeAt should be in the future when quota is paused")
 	}
 
-	// Simulate recovery: clear the pause.
 	p.mu.Lock()
 	p.status.QuotaPaused = false
 	p.status.QuotaResumeAt = ""
@@ -916,14 +870,11 @@ func TestPipeline_QuotaResumeAt_SetOnPause(t *testing.T) {
 	}
 }
 
-// TestPipeline_QuotaResumeAt_PopulatedFromLimiter — Phase 3
-// When waitForQuotaRecovery is entered, it must populate QuotaResumeAt from
-// the embedder's rate limiter PausedUntil value (set before calling waitForQuotaRecovery).
+// TestPipeline_QuotaResumeAt_PopulatedFromLimiter verifies QuotaResumeAt is
+// populated from the embedder's rate limiter PausedUntil value.
 func TestPipeline_QuotaResumeAt_PopulatedFromLimiter(t *testing.T) {
 	p, _, _ := newTestPipelineWithMock(t, &mockEmbedder{}, nil, 1)
 
-	// Simulate what the pipeline does just before calling waitForQuotaRecovery:
-	// set QuotaPaused=true and populate QuotaResumeAt from the limiter's pause deadline.
 	resumeAt := time.Now().Add(30 * time.Second)
 	p.mu.Lock()
 	p.status.QuotaPaused = true
@@ -939,8 +890,8 @@ func TestPipeline_QuotaResumeAt_PopulatedFromLimiter(t *testing.T) {
 	}
 }
 
-// TestEmbedder_Limiter_Returns_RateLimiter — Phase 3
-// Embedder.Limiter() must return the internal *RateLimiter (non-nil).
+// TestEmbedder_Limiter_Returns_RateLimiter verifies Embedder.Limiter returns
+// the internal *RateLimiter.
 func TestEmbedder_Limiter_Returns_RateLimiter(t *testing.T) {
 	emb, err := embedder.NewEmbedder("fake-key-limiter-test", 768, testLogger())
 	if err != nil {
@@ -952,13 +903,11 @@ func TestEmbedder_Limiter_Returns_RateLimiter(t *testing.T) {
 	}
 }
 
-// TestPipeline_WaitForQuotaRecovery_SetsAndClears — Phase 3
-// waitForQuotaRecovery must: set QuotaPaused=true and QuotaResumeAt before waiting,
-// then clear both when recovery completes.
+// TestPipeline_WaitForQuotaRecovery_SetsAndClears verifies quota status fields
+// are cleared when recovery completes.
 func TestPipeline_WaitForQuotaRecovery_SetsAndClears(t *testing.T) {
 	p, _, _ := newTestPipelineWithMock(t, &mockEmbedder{}, nil, 1)
 
-	// Pre-populate QuotaPaused and QuotaResumeAt as if the caller set them.
 	resumeAt := time.Now().Add(35 * time.Millisecond)
 	p.mu.Lock()
 	p.status.QuotaPaused = true
@@ -982,9 +931,8 @@ func TestPipeline_WaitForQuotaRecovery_SetsAndClears(t *testing.T) {
 	}
 }
 
-// TestPipeline_IndexFile_QuotaError_SetsQuotaPaused — Phase 3
-// When EmbedBatch returns a quota-exhausted error, indexFile must set
-// QuotaPaused=true in pipeline status and QuotaResumeAt must be non-empty.
+// TestPipeline_IndexFile_QuotaError_SetsQuotaPaused verifies a quota-exhausted
+// EmbedBatch error sets QuotaPaused and QuotaResumeAt in pipeline status.
 func TestPipeline_IndexFile_QuotaError_SetsQuotaPaused(t *testing.T) {
 	quotaErr := fmt.Errorf("all keys exhausted")
 	mock := &mockEmbedder{err: quotaErr}
@@ -996,8 +944,6 @@ func TestPipeline_IndexFile_QuotaError_SetsQuotaPaused(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// indexFile should detect the quota error and set QuotaPaused.
-	// It returns an error (the quota error).
 	_ = p.indexFile(p.ctx, filePath, true)
 
 	s := p.Status()
@@ -1026,13 +972,11 @@ func TestPipeline_RaceCondition(t *testing.T) {
 		}
 	}
 
-	// Submit all 8 jobs.
 	for i := 0; i < numFiles; i++ {
 		fpath := filepath.Join(dir, fmt.Sprintf("race%d.txt", i))
 		p.SubmitFile(fpath)
 	}
 
-	// Wait until pendingJobs reaches 0 or timeout.
 	deadline := time.After(10 * time.Second)
 	for {
 		if p.pendingJobs.Load() == 0 {
@@ -1054,7 +998,6 @@ func TestPipeline_EmbedBatch_150Chunks(t *testing.T) {
 	p, _, _ := newTestPipelineWithMock(t, mock, nil, 1)
 
 	dir := t.TempDir()
-	// Each chunk is ~400 bytes of text; 150 chunks ≈ 60 KB.
 	chunk := strings.Repeat("a", 400) + " "
 	content := strings.Repeat(chunk, 160)
 	filePath := filepath.Join(dir, "large.txt")
@@ -1094,7 +1037,6 @@ func TestProcessFolder_IndexesAllFilesInline(t *testing.T) {
 		}
 	}
 
-	// processFolder runs synchronously and should embed all files before returning.
 	p.processFolder(dir, nil, false)
 
 	mock.mu.Lock()
@@ -1106,8 +1048,7 @@ func TestProcessFolder_IndexesAllFilesInline(t *testing.T) {
 	}
 }
 
-// TestIndexer_WritesVectorBlob — Phase 3
-// After indexing a text file, every chunk in the store must have a non-nil
+// TestIndexer_WritesVectorBlob verifies every indexed chunk has a non-nil
 // VectorBlob whose length matches 4 bytes × number of dimensions returned by
 // the mock embedder (3 dims → 12 bytes per chunk).
 func TestIndexer_WritesVectorBlob(t *testing.T) {
@@ -1147,16 +1088,14 @@ func TestIndexer_WritesVectorBlob(t *testing.T) {
 	}
 }
 
-// TestIndexer_VectorBlobMatchesEmbedding — Phase 3
-// Decoded VectorBlob bytes must round-trip back to the original float32 slice
-// produced by the mock embedder.
+// TestIndexer_VectorBlobMatchesEmbedding verifies decoded VectorBlob bytes
+// round-trip back to the original float32 slice produced by the mock embedder.
 func TestIndexer_VectorBlobMatchesEmbedding(t *testing.T) {
 	mock := &mockEmbedder{}
 	p, s, _ := newTestPipelineWithMock(t, mock, nil, 1)
 
 	dir := t.TempDir()
 	filePath := filepath.Join(dir, "roundtrip_test.txt")
-	// Single chunk of content so we know exactly which embedding was stored.
 	content := "a single chunk of content for round-trip test"
 	if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
@@ -1298,10 +1237,6 @@ func TestPipeline_WritesModelAndDims(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Phase 4: apperr wrap-site tests — REQ-003, EDGE-015..019
-// ---------------------------------------------------------------------------
-
 // TestIndexFile_FailurePathsAreWrapped is a table test that exercises the embed
 // quota path and generic-embed-failure path, asserting errors.As extracts the
 // expected apperr code. REQ-003, EDGE-015, EDGE-016.
@@ -1318,8 +1253,7 @@ func TestIndexFile_FailurePathsAreWrapped(t *testing.T) {
 		wantCode string
 	}{
 		{
-			name: "quota exhausted → ErrRateLimited",
-			// The existing quota error string that isQuotaExhaustedError detected.
+			name:     "quota exhausted → ErrRateLimited",
 			embedErr: fmt.Errorf("all keys exhausted"),
 			wantCode: apperr.ErrRateLimited.Code,
 		},
@@ -1454,7 +1388,6 @@ func TestIndexFile_HnswAdd_IsWrapped(t *testing.T) {
 	mock := &mockEmbedder{}
 	p, _, _ := newTestPipelineWithMock(t, mock, nil, 1)
 
-	// Swap the index with one that always fails on Add.
 	p.index = &alwaysFailIndex{}
 
 	dir := t.TempDir()
@@ -1492,7 +1425,6 @@ func (a *alwaysFailIndex) Has(id string) bool    { return false }
 func TestIndexFile_StoreWrite_CommitWrapped(t *testing.T) {
 	p, s, _ := newTestPipeline(t, nil)
 
-	// Close the store to force UpdateContentHash to fail.
 	s.Close()
 
 	err := p.commit(-999, "fakehash")
@@ -1525,7 +1457,6 @@ func TestIndexFile_EDGE019_TypeUnknown_ReturnsNil(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// indexFile should return nil for TypeUnknown (silently skipped).
 	err := p.indexFile(p.ctx, filePath, true)
 	if err != nil {
 		t.Fatalf("EDGE-019: expected nil for TypeUnknown file, got: %v", err)

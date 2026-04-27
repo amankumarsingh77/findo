@@ -26,7 +26,6 @@ func TestWatcher_DetectsNewFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create a file
 	testFile := filepath.Join(dir, "test.txt")
 	os.WriteFile(testFile, []byte("hello"), 0o644)
 
@@ -43,7 +42,6 @@ func TestWatcher_DetectsNewFile(t *testing.T) {
 func TestWatcher_DetectsModifiedFile(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create file before watching
 	testFile := filepath.Join(dir, "existing.txt")
 	os.WriteFile(testFile, []byte("original"), 0o644)
 
@@ -59,7 +57,6 @@ func TestWatcher_DetectsModifiedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Modify the file
 	os.WriteFile(testFile, []byte("modified"), 0o644)
 
 	select {
@@ -75,7 +72,6 @@ func TestWatcher_DetectsModifiedFile(t *testing.T) {
 func TestWatcher_DetectsDeletedFile(t *testing.T) {
 	dir := t.TempDir()
 
-	// Create file before watching
 	testFile := filepath.Join(dir, "todelete.txt")
 	os.WriteFile(testFile, []byte("delete me"), 0o644)
 
@@ -91,7 +87,6 @@ func TestWatcher_DetectsDeletedFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Delete the file
 	os.Remove(testFile)
 
 	select {
@@ -124,7 +119,6 @@ func TestWatcher_Remove(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// After removal, file changes should not trigger events.
 	os.WriteFile(filepath.Join(dir, "test.txt"), []byte("hello"), 0644)
 	time.Sleep(200 * time.Millisecond)
 
@@ -132,6 +126,5 @@ func TestWatcher_Remove(t *testing.T) {
 	case ev := <-events:
 		t.Fatalf("should not receive event after remove, got %v", ev)
 	default:
-		// Good — no events.
 	}
 }

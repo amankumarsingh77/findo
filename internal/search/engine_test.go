@@ -22,7 +22,6 @@ func TestEngine_SearchReturnsRankedResults(t *testing.T) {
 	defer db.Close()
 	idx := vectorstore.NewDefaultIndex(testLogger)
 
-	// Insert a file + chunk
 	fileID, err := db.UpsertFile(store.FileRecord{
 		Path: "/tmp/test.txt", FileType: "text", Extension: ".txt",
 		SizeBytes: 100,
@@ -37,7 +36,6 @@ func TestEngine_SearchReturnsRankedResults(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Add matching vector
 	vec := make([]float32, 768)
 	vec[0] = 1.0
 	if err := idx.Add("vec-1", vec); err != nil {
@@ -46,7 +44,6 @@ func TestEngine_SearchReturnsRankedResults(t *testing.T) {
 
 	engine := New(db, idx, testLogger, DefaultEngineConfig())
 
-	// Search with similar vector
 	query := make([]float32, 768)
 	query[0] = 1.0
 	results, err := engine.SearchByVector(query, 5)
@@ -72,7 +69,6 @@ func TestEngine_DeduplicatesByFilePath(t *testing.T) {
 	defer db.Close()
 	idx := vectorstore.NewDefaultIndex(testLogger)
 
-	// Insert one file with two chunks
 	fileID, err := db.UpsertFile(store.FileRecord{
 		Path: "/tmp/multi.txt", FileType: "text", Extension: ".txt",
 		SizeBytes: 200,
@@ -93,7 +89,6 @@ func TestEngine_DeduplicatesByFilePath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Add both vectors (slightly different but both close to query)
 	vecA := make([]float32, 768)
 	vecA[0] = 1.0
 	vecA[1] = 0.1
@@ -113,7 +108,6 @@ func TestEngine_DeduplicatesByFilePath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Should be deduplicated to 1 result (same file)
 	if len(results) != 1 {
 		t.Fatalf("expected 1 deduplicated result, got %d", len(results))
 	}
@@ -154,8 +148,6 @@ func TestEngine_PropagatesDistance(t *testing.T) {
 
 	engine := New(db, idx, testLogger, DefaultEngineConfig())
 
-	// Identical query vector → cosine distance should be ~0 (not left as Go zero)
-	// We can't assert exact value, but we can assert it was set (non-negative float32).
 	query := make([]float32, 768)
 	query[0] = 1.0
 	results, err := engine.SearchByVector(query, 5)
@@ -165,7 +157,6 @@ func TestEngine_PropagatesDistance(t *testing.T) {
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
 	}
-	// Distance should be >= 0 and was set from distMap (zero is valid for identical vectors)
 	if results[0].Distance < 0 {
 		t.Fatalf("expected non-negative distance, got %v", results[0].Distance)
 	}
@@ -201,12 +192,10 @@ func TestEngine_DeduplicatesByLowestDistance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// vec-close is nearly identical to query [1, 0, ...]
 	vecClose := make([]float32, 768)
 	vecClose[0] = 1.0
 	idx.Add("vec-close", vecClose)
 
-	// vec-far is orthogonal — very different from query
 	vecFar := make([]float32, 768)
 	vecFar[1] = 1.0
 	idx.Add("vec-far", vecFar)
@@ -220,11 +209,9 @@ func TestEngine_DeduplicatesByLowestDistance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Deduped to 1 result
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result after dedup, got %d", len(results))
 	}
-	// The kept result should be the closer one
 	if results[0].VectorID != "vec-close" {
 		t.Fatalf("expected vec-close (lower distance) to be kept, got %s", results[0].VectorID)
 	}
@@ -281,7 +268,6 @@ func TestEngine_SearchWithSpec_EmptySpec(t *testing.T) {
 
 	queryVec := make([]float32, 768)
 	queryVec[0] = 1.0
-	// Empty spec — no Must/MustNot → semantic path
 	res, err := engine.SearchWithSpec(queryVec, query.FilterSpec{}, "", 5)
 	if err != nil {
 		t.Fatal(err)

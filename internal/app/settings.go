@@ -66,7 +66,6 @@ func (a *App) SetGeminiAPIKey(key string) error {
 	a.apiKeyMu.Lock()
 	defer a.apiKeyMu.Unlock()
 
-	// Track whether we paused indexing so we can restore state.
 	wasPaused := a.pipeline.Status().Paused
 	if !wasPaused {
 		a.pipeline.Pause()
@@ -78,14 +77,12 @@ func (a *App) SetGeminiAPIKey(key string) error {
 		}
 	}
 
-	// Create a temporary embedder — never stored unless validation passes.
 	tmpEmb, err := embedder.NewEmbedder(key, 768, a.logger)
 	if err != nil {
 		restore()
 		return apperr.Wrap(apperr.ErrConfigInvalid.Code, "failed to create embedder", err)
 	}
 
-	// Validate with a real test call, 10s timeout.
 	ctx, cancel := context.WithTimeout(a.ctx, 10*time.Second)
 	defer cancel()
 	if _, err := tmpEmb.EmbedQuery(ctx, "test"); err != nil {
@@ -93,14 +90,12 @@ func (a *App) SetGeminiAPIKey(key string) error {
 		return apperr.Wrap(apperr.ErrEmbedFailed.Code, "API key validation failed", err)
 	}
 
-	// Validation passed — commit atomically.
 	if err := a.store.SetSetting("gemini_api_key", key); err != nil {
 		restore()
 		return apperr.Wrap(apperr.ErrStoreLocked.Code, "failed to persist API key", err)
 	}
 	a.embedder = tmpEmb
 	a.pipeline.SetEmbedder(tmpEmb)
-	// Rebuild LLM parser so it uses the new client from the hot-swapped embedder.
 	a.llmParser = query.NewLLMParserWithConfig(tmpEmb.Client(), tmpEmb.Limiter(), query.LLMConfig{
 		Model:      a.cfg.Query.LLMModel,
 		TimeoutMs:  a.cfg.Query.LLMTimeoutMs,
@@ -178,7 +173,6 @@ func (a *App) applyPersistedIndexingOverrides() {
 	}
 }
 
-// Indexing settings keys persisted in the settings KV table.
 const (
 	settingIndexingWorkers   = "indexing.workers"
 	settingIndexingRateLimit = "indexing.rate_limit_per_minute"
@@ -243,8 +237,6 @@ func (a *App) SetIndexingSettings(workers, rateLimit int) error {
 	return nil
 }
 
-// getBruteForceThreshold returns the configured brute_force_threshold setting,
-// falling back to DefaultBruteForceThreshold if unset or invalid.
 func (a *App) getBruteForceThreshold() int {
 	if a.store == nil {
 		return search.DefaultBruteForceThreshold

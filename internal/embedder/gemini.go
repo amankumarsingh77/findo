@@ -317,7 +317,6 @@ func (e *GeminiEmbedder) Stats() Stats {
 	e.statsMu.Lock()
 	today := time.Now().Format("2006-01-02")
 	if e.requestsDay != today {
-		// Date rolled over (or first read after startup); reset the counter.
 		e.requestsDay = today
 		e.requestsToday = 0
 	}

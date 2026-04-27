@@ -123,7 +123,6 @@ func TestFailureRegistry_REQ015_Eviction(t *testing.T) {
 
 // REQ-016 / EDGE-006: 100 goroutines × 10 distinct paths each, -race, Len == 1000.
 func TestFailureRegistry_REQ016_Race(t *testing.T) {
-	// 100 goroutines × 10 paths → 1000 distinct paths
 	const goroutines = 100
 	const pathsPerGoroutine = 10
 	const total = goroutines * pathsPerGoroutine
@@ -165,7 +164,6 @@ func TestFailureRegistry_REQ017_Groups(t *testing.T) {
 		t.Fatalf("Groups(): got %d want 2", len(groups))
 	}
 
-	// Sorted by count desc: A(5) before B(2)
 	if groups[0].Code != "ERR_EXTRACTION_FAILED" {
 		t.Errorf("groups[0].Code: got %q want ERR_EXTRACTION_FAILED", groups[0].Code)
 	}
@@ -205,8 +203,6 @@ func TestFailureRegistry_EDGE007_RepeatedEviction(t *testing.T) {
 	const cap = 5
 	r := NewFailureRegistry(cap)
 
-	// Record cap + 3 distinct paths.
-	// Paths: file0..file7 (8 total), cap=5 → 3 dropped.
 	paths := make([]string, cap+3)
 	for i := range paths {
 		paths[i] = fmt.Sprintf("/tmp/file%d.pdf", i)
@@ -220,7 +216,6 @@ func TestFailureRegistry_EDGE007_RepeatedEviction(t *testing.T) {
 		t.Errorf("DroppedCount(): got %d want 3", r.DroppedCount())
 	}
 
-	// First 3 paths should be evicted.
 	snap := r.Snapshot()
 	presentPaths := make(map[string]bool)
 	for _, e := range snap {
@@ -243,7 +238,7 @@ func TestFailureRegistry_REQ012_DedupPreservesOrder(t *testing.T) {
 	r := NewFailureRegistry(10)
 	r.Record("/tmp/a.pdf", "ERR_EXTRACTION_FAILED", "msg", 1)
 	r.Record("/tmp/b.pdf", "ERR_EXTRACTION_FAILED", "msg", 1)
-	r.Record("/tmp/a.pdf", "ERR_EXTRACTION_FAILED", "updated msg", 2) // update; should stay first
+	r.Record("/tmp/a.pdf", "ERR_EXTRACTION_FAILED", "updated msg", 2)
 
 	snap := r.Snapshot()
 	if len(snap) != 2 {
@@ -276,7 +271,6 @@ func TestFailureRegistry_SnapshotIsCopy(t *testing.T) {
 // Groups sorted by count desc, then by code asc when counts are equal.
 func TestFailureRegistry_Groups_SortDeterminism(t *testing.T) {
 	r := NewFailureRegistry(100)
-	// Two codes with the same count — should sort by code asc.
 	for i := 0; i < 3; i++ {
 		r.Record(fmt.Sprintf("/tmp/z%d.pdf", i), "ERR_Z_CODE", "msg", 1)
 		r.Record(fmt.Sprintf("/tmp/a%d.pdf", i), "ERR_A_CODE", "msg", 1)
@@ -286,7 +280,6 @@ func TestFailureRegistry_Groups_SortDeterminism(t *testing.T) {
 	if len(groups) != 2 {
 		t.Fatalf("Groups(): got %d want 2", len(groups))
 	}
-	// When count equal, code ascending → ERR_A_CODE before ERR_Z_CODE
 	codes := []string{groups[0].Code, groups[1].Code}
 	if !sort.StringsAreSorted(codes) {
 		t.Errorf("equal-count groups not sorted by code asc: %v", codes)
@@ -302,7 +295,6 @@ func TestFailureRegistry_Groups_LabelKnownCode(t *testing.T) {
 	if len(groups) != 1 {
 		t.Fatalf("Groups(): got %d want 1", len(groups))
 	}
-	// Label should be the apperr message for this code.
 	want := "text extraction from file failed"
 	if groups[0].Label != want {
 		t.Errorf("Label: got %q want %q", groups[0].Label, want)
@@ -315,7 +307,6 @@ func BenchmarkFailureRegistry_Record(b *testing.B) {
 	r := NewFailureRegistry(cap)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		// Keep index within cap so we measure the fast path (map update or append).
 		path := fmt.Sprintf("/tmp/file%d.pdf", i%cap)
 		r.Record(path, "ERR_EXTRACTION_FAILED", "msg", 1)
 	}

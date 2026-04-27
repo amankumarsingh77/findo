@@ -96,7 +96,6 @@ func applyFS(db *sql.DB, logger *slog.Logger, src fs.FS, dir string, backfill Ba
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
 			continue
 		}
-		// Skip rollback (down) migration files — only forward migrations are applied.
 		if strings.HasSuffix(e.Name(), ".down.sql") {
 			continue
 		}

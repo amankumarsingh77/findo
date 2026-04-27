@@ -45,7 +45,6 @@ func ChunkText(filePath string) ([]Chunk, error) {
 	return chunkString(string(data), 0), nil
 }
 
-// chunkString splits text into overlapping chunks starting at the given index.
 func chunkString(content string, startIndex int) []Chunk {
 	if len(content) == 0 {
 		return nil

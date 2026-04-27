@@ -130,7 +130,6 @@ func clauseToSQL(c Clause, negate bool) (string, []any, error) {
 	case OpInSet:
 		vals, ok := c.Value.([]any)
 		if !ok {
-			// Try to convert []string
 			if strVals, ok2 := c.Value.([]string); ok2 {
 				vals = make([]any, len(strVals))
 				for i, v := range strVals {
@@ -141,7 +140,7 @@ func clauseToSQL(c Clause, negate bool) (string, []any, error) {
 			}
 		}
 		if len(vals) == 0 {
-			return "1=0", nil, nil // empty set matches nothing
+			return "1=0", nil, nil
 		}
 		placeholders := make([]string, len(vals))
 		for i := range vals {

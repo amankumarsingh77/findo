@@ -265,10 +265,8 @@ func (p *Pipeline) SubmitFolder(folderPath string, excludePatterns []string, for
 // prevents duplicate attempts for the same path. The retry coordinator will drop
 // the stale job at dequeue (stamp mismatch) and decrement its own pendingCount then.
 func (p *Pipeline) SubmitFile(filePath string) {
-	// Cancel any pending retry for this path (EDGE-010).
 	if p.retryCoord != nil {
 		if p.retryCoord.CancelPath(filePath) {
-			// Decrement PendingRetryFiles immediately so the UI reflects the collapse.
 			// The coordinator will decrement its own pendingCount when it dequeues the
 			// stale job — do NOT decrement pendingCount here to avoid double-decrement.
 			p.mu.Lock()
@@ -312,7 +310,6 @@ func (p *Pipeline) worker() {
 				p.processFolder(job.folderPath, job.excludePatterns, job.force)
 			case jobSingleFile:
 				if job.attempts > 0 {
-					// Re-submitted by the retry coordinator — do NOT increment TotalFiles.
 					p.processRetryFile(job.filePath, job.attempts)
 				} else {
 					p.processSingleFile(job.filePath, 0)
@@ -414,12 +411,12 @@ fileLoop:
 
 		p.waitIfPaused()
 
-		sem <- struct{}{} // acquire slot
+		sem <- struct{}{}
 		wg.Add(1)
 		fp := filePath
 		go func() {
 			defer wg.Done()
-			defer func() { <-sem }() // release slot
+			defer func() { <-sem }()
 
 			p.mu.Lock()
 			p.status.CurrentFile = fp
@@ -506,11 +503,9 @@ func (p *Pipeline) Registry() *FailureRegistry {
 // curAttempts is the number of attempts including the one that just failed.
 func (p *Pipeline) handleFileError(filePath string, curAttempts int, err error) {
 	if errors.Is(err, errStaleGeneration) {
-		// Discarded due to generation change — neither success nor failure (EDGE-001).
 		return
 	}
 
-	// Extract apperr.Error; fall back to ERR_INTERNAL/Permanent for raw errors (REQ-004).
 	var appErr *apperr.Error
 	code := apperr.ErrInternal.Code
 	msg := err.Error()
@@ -519,7 +514,6 @@ func (p *Pipeline) handleFileError(filePath string, curAttempts int, err error) 
 		msg = appErr.Message
 	}
 
-	// Handle quota status update alongside classification.
 	if errors.Is(err, apperr.ErrRateLimited) {
 		resumeAt := p.quotaResumeTime()
 		p.mu.Lock()
@@ -531,7 +525,6 @@ func (p *Pipeline) handleFileError(filePath string, curAttempts int, err error) 
 
 	cls := apperr.Classify(err)
 	if cls == apperr.ClassPermanent || curAttempts >= maxAttempts {
-		// Terminal failure: record in registry and increment FailedFiles.
 		p.logger.Warn("file indexing failed", "path", filePath, "error", err, "code", code, "attempts", curAttempts)
 		if p.registry != nil {
 			p.registry.Record(filePath, code, msg, curAttempts)
@@ -542,14 +535,12 @@ func (p *Pipeline) handleFileError(filePath string, curAttempts int, err error) 
 		return
 	}
 
-	// Transient failure within retry budget: schedule retry.
 	if p.retryCoord != nil {
 		p.retryCoord.Schedule(filePath, code, msg, curAttempts+1)
 		p.mu.Lock()
 		p.status.PendingRetryFiles++
 		p.mu.Unlock()
 	} else {
-		// No retry coordinator: treat as terminal.
 		p.logger.Warn("file indexing failed (no retry coord)", "path", filePath, "error", err, "code", code)
 		if p.registry != nil {
 			p.registry.Record(filePath, code, msg, curAttempts)
@@ -591,7 +582,6 @@ func (p *Pipeline) indexFile(ctx context.Context, filePath string, force bool) e
 		return err
 	}
 	if vectors == nil && batchChunks == nil {
-		// All chunks were empty; hash already committed inside embedBatched.
 		return nil
 	}
 

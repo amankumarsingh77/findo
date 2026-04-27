@@ -35,8 +35,6 @@ func TestScore_BasicSubsequenceMatches(t *testing.T) {
 			wantMaxScore: 1.0,
 		},
 		{
-			// dmo matches via d(word-boundary) + m + o(consecutive with m).
-			// The word-boundary bonus on 'd' pushes the score high.
 			name:         "dmo in demo.py — subsequence with gap",
 			pattern:      "dmo",
 			candidate:    "demo.py",
@@ -44,10 +42,10 @@ func TestScore_BasicSubsequenceMatches(t *testing.T) {
 			wantMaxScore: 1.0,
 		},
 		{
-			name:     "xyz not in demo.py",
-			pattern:  "xyz",
+			name:      "xyz not in demo.py",
+			pattern:   "xyz",
 			candidate: "demo.py",
-			wantZero: true,
+			wantZero:  true,
 		},
 		{
 			name:         "py at end of demo.py",
@@ -71,16 +69,16 @@ func TestScore_BasicSubsequenceMatches(t *testing.T) {
 			wantMaxScore: 1.0,
 		},
 		{
-			name:     "demo cannot match dem.py — missing o",
-			pattern:  "demo",
+			name:      "demo cannot match dem.py — missing o",
+			pattern:   "demo",
 			candidate: "dem.py",
-			wantZero: true,
+			wantZero:  true,
 		},
 		{
-			name:     "empty candidate non-empty pattern",
-			pattern:  "demo",
+			name:      "empty candidate non-empty pattern",
+			pattern:   "demo",
 			candidate: "",
-			wantZero: true,
+			wantZero:  true,
 		},
 	}
 
@@ -171,14 +169,13 @@ func TestScore_OrderingConsistency(t *testing.T) {
 	t.Parallel()
 
 	scoreDemoPy, _ := Score("demo", "demo.py")
-	scoreDemPy, _ := Score("demo", "dem.py")   // 'o' missing → 0
+	scoreDemPy, _ := Score("demo", "dem.py")     // 'o' missing → 0
 	scoreXemonp, _ := Score("demo", "xemonp.py") // subsequence d-e-m-o not present
 
 	if scoreDemPy != 0 {
 		t.Errorf("Score(\"demo\", \"dem.py\") = %v, want 0 (no 'o' in candidate)", scoreDemPy)
 	}
 	if scoreXemonp != 0 {
-		// xemonp.py: x-e-m-o-n-p — 'd' not in candidate, so no match.
 		t.Errorf("Score(\"demo\", \"xemonp.py\") = %v, want 0 (no 'd' in candidate)", scoreXemonp)
 	}
 	if scoreDemoPy <= 0 {
@@ -191,9 +188,7 @@ func TestScore_OrderingConsistency(t *testing.T) {
 func TestScore_CaseBonus(t *testing.T) {
 	t.Parallel()
 
-	// Lowercase pattern against lowercase candidate should have case bonus.
 	scoreLower, _ := Score("demo", "demo.py")
-	// Uppercase pattern against lowercase candidate: no case bonus.
 	scoreUpper, _ := Score("DEMO", "demo.py")
 
 	if scoreLower < scoreUpper {
@@ -301,8 +296,8 @@ func TestRescoreTopN(t *testing.T) {
 	candidates := []Candidate{
 		{Text: "demo.py", Payload: "p1"},
 		{Text: "demolition.go", Payload: "p2"},
-		{Text: "dem.txt", Payload: "p3"},        // 'demo' has no 'o' in dem.txt → 0
-		{Text: "xyzabc.rs", Payload: "p4"},       // no match
+		{Text: "dem.txt", Payload: "p3"},   // 'demo' has no 'o' in dem.txt → 0
+		{Text: "xyzabc.rs", Payload: "p4"}, // no match
 		{Text: "demo_test.go", Payload: "p5"},
 		{Text: "demography.md", Payload: "p6"},
 		{Text: "unrelated.csv", Payload: "p7"},
@@ -317,7 +312,6 @@ func TestRescoreTopN(t *testing.T) {
 		t.Fatalf("RescoreTopN returned %d results, want 3", len(top3))
 	}
 
-	// Scores should be in descending order.
 	for i := 1; i < len(top3); i++ {
 		if top3[i].Score > top3[i-1].Score {
 			t.Errorf("RescoreTopN results not sorted: top3[%d].Score=%v > top3[%d].Score=%v",
@@ -325,12 +319,10 @@ func TestRescoreTopN(t *testing.T) {
 		}
 	}
 
-	// The top result must have matched offsets (non-nil, non-empty since pattern is non-empty).
 	if top3[0].Matched == nil {
 		t.Errorf("top3[0].Matched = nil, want non-nil slice")
 	}
 
-	// All returned scores must be > 0 (zero-match candidates are excluded).
 	for i, s := range top3 {
 		if s.Score <= 0 {
 			t.Errorf("top3[%d].Score = %v, want > 0", i, s.Score)
@@ -356,7 +348,6 @@ func TestRescoreTopN_EmptyPattern(t *testing.T) {
 		{Text: "c.go", Payload: 3},
 	}
 	got := RescoreTopN("", candidates, 2)
-	// Empty pattern → vacuous match (score 1.0 for all); top 2 returned.
 	if len(got) != 2 {
 		t.Errorf("RescoreTopN(\"\", ..., 2) = %d results, want 2", len(got))
 	}
@@ -428,7 +419,6 @@ func TestScore_AlreadySortedByRescoreTopN(t *testing.T) {
 		{Text: "allocate.go"},
 	}
 	got := RescoreTopN("al", candidates, 10)
-	// Verify non-ascending order (equal scores are fine; only an increase violates).
 	for i := 1; i < len(got); i++ {
 		if got[i].Score > got[i-1].Score {
 			scores := make([]float64, len(got))

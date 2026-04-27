@@ -8,8 +8,6 @@ import (
 	"findo/internal/vectorstore"
 )
 
-// --- helpers ---
-
 func makeVec(val float32, dim int) []float32 {
 	v := make([]float32, dim)
 	v[0] = val
@@ -33,8 +31,6 @@ func seedFileWithVec(t *testing.T, db *store.Store, idx *vectorstore.Index, path
 	}
 	return fileID
 }
-
-// --- TestPlanner_UnfilteredUsesHNSW ---
 
 // TestPlanner_UnfilteredUsesHNSW verifies that an empty FilterSpec (no Must/MustNot)
 // routes through the "semantic" path (calls index.Search directly).
@@ -76,12 +72,10 @@ func TestPlanner_BruteForceWhenCountBelowThreshold(t *testing.T) {
 	defer db.Close()
 	idx := vectorstore.NewDefaultIndex(testLogger)
 
-	// Seed 3 image files
 	for i, name := range []string{"img1.png", "img2.png", "img3.png"} {
 		vec := makeVec(float32(i+1)*0.1, 768)
 		seedFileWithVec(t, db, idx, "/tmp/"+name, "image", "vec-img-"+name, vec)
 	}
-	// Seed 1 text file (should not match image filter)
 	seedFileWithVec(t, db, idx, "/tmp/doc.txt", "text", "vec-doc", makeVec(0.9, 768))
 
 	spec := query.FilterSpec{
@@ -100,7 +94,6 @@ func TestPlanner_BruteForceWhenCountBelowThreshold(t *testing.T) {
 	if plannerCount != 3 {
 		t.Errorf("expected plannerCount=3 (image files), got %d", plannerCount)
 	}
-	// All results should be image files
 	for _, r := range results {
 		if r.File.FileType != "image" {
 			t.Errorf("expected image file, got %q", r.File.FileType)
@@ -119,7 +112,6 @@ func TestPlanner_HNSWPostFilterWhenCountAboveThreshold(t *testing.T) {
 	defer db.Close()
 	idx := vectorstore.NewDefaultIndex(testLogger)
 
-	// Seed 2 image files
 	for i, name := range []string{"img1.png", "img2.png"} {
 		vec := makeVec(float32(i+1)*0.1, 768)
 		seedFileWithVec(t, db, idx, "/tmp/"+name, "image", "vec-img-"+name, vec)
@@ -129,7 +121,6 @@ func TestPlanner_HNSWPostFilterWhenCountAboveThreshold(t *testing.T) {
 		Must: []query.Clause{{Field: query.FieldFileType, Op: query.OpEq, Value: "image"}},
 	}
 
-	// threshold=1 so count(2) >= threshold → hnsw_post_filter
 	planner := NewPlanner(db, idx, PlannerConfig{BruteForceThreshold: 1})
 	queryVec := makeVec(1.0, 768)
 	_, strategy, plannerCount, err := planner.Plan(queryVec, spec, 5)
@@ -180,7 +171,6 @@ func TestPlanner_ReturnsEmptyWhenCountZero(t *testing.T) {
 // TestBruteForceCosine_ExactRecall verifies that a query exactly matching vec1
 // ranks vec1 first.
 func TestBruteForceCosine_ExactRecall(t *testing.T) {
-	// 3 unit vectors along different dimensions
 	v1 := make([]float32, 768)
 	v1[0] = 1.0
 	v2 := make([]float32, 768)
@@ -194,7 +184,6 @@ func TestBruteForceCosine_ExactRecall(t *testing.T) {
 		3: {v3},
 	}
 
-	// Query matches v1 exactly
 	queryVec := make([]float32, 768)
 	queryVec[0] = 1.0
 
@@ -205,7 +194,6 @@ func TestBruteForceCosine_ExactRecall(t *testing.T) {
 	if results[0].File.ID != 1 {
 		t.Errorf("expected file ID 1 (exact match) ranked first, got %d", results[0].File.ID)
 	}
-	// Distance should be ~0 for exact match
 	if results[0].Distance > 0.01 {
 		t.Errorf("expected near-zero distance for exact match, got %f", results[0].Distance)
 	}
@@ -232,13 +220,11 @@ func TestSearchWithSpec_FiltersResults(t *testing.T) {
 	defer db.Close()
 	idx := vectorstore.NewDefaultIndex(testLogger)
 
-	// Seed one image and one text file with similar vectors
 	imgVec := makeVec(1.0, 768)
 	txtVec := makeVec(0.99, 768)
 	seedFileWithVec(t, db, idx, "/tmp/photo.png", "image", "vec-img", imgVec)
 	seedFileWithVec(t, db, idx, "/tmp/readme.txt", "text", "vec-txt", txtVec)
 
-	// Use threshold=0 to force HNSW post-filter path, which joins full metadata.
 	planner := NewPlanner(db, idx, PlannerConfig{})
 	engine := NewWithPlanner(db, idx, testLogger, planner)
 

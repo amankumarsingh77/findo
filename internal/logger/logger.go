@@ -17,9 +17,9 @@ import (
 func New(dataDir string) *slog.Logger {
 	fileWriter := &lumberjack.Logger{
 		Filename:   filepath.Join(dataDir, "findo.log"),
-		MaxSize:    50, // megabytes
+		MaxSize:    50,
 		MaxBackups: 3,
-		MaxAge:     28, // days
+		MaxAge:     28,
 		Compress:   true,
 	}
 

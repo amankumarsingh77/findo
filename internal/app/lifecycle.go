@@ -9,7 +9,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// exitProcess is overridable for tests; default terminates the process.
 var exitProcess = func(code int) { os.Exit(code) }
 
 // SetBaseContext stores a context that startup will derive its background

@@ -59,6 +59,7 @@ type mockEmbedder struct {
 func (m *mockEmbedder) ModelID() string        { return "mock" }
 func (m *mockEmbedder) Dimensions() int        { return 3 }
 func (m *mockEmbedder) PausedUntil() time.Time { return time.Time{} }
+func (m *mockEmbedder) Stats() embedder.Stats  { return embedder.Stats{} }
 func (m *mockEmbedder) EmbedQuery(_ context.Context, _ string) ([]float32, error) {
 	return []float32{0, 0, 0}, nil
 }
@@ -1407,6 +1408,7 @@ type countMismatchEmbedder struct{}
 func (c *countMismatchEmbedder) ModelID() string        { return "mismatch-mock" }
 func (c *countMismatchEmbedder) Dimensions() int        { return 3 }
 func (c *countMismatchEmbedder) PausedUntil() time.Time { return time.Time{} }
+func (c *countMismatchEmbedder) Stats() embedder.Stats  { return embedder.Stats{} }
 func (c *countMismatchEmbedder) EmbedQuery(_ context.Context, _ string) ([]float32, error) {
 	return []float32{0, 0, 0}, nil
 }

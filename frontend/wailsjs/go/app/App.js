@@ -22,6 +22,10 @@ export function GetDebugStats() {
   return window['go']['app']['App']['GetDebugStats']();
 }
 
+export function GetEmbedderStats() {
+  return window['go']['app']['App']['GetEmbedderStats']();
+}
+
 export function GetFilePreview(arg1) {
   return window['go']['app']['App']['GetFilePreview'](arg1);
 }

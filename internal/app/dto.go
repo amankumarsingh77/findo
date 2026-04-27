@@ -18,9 +18,9 @@ type SearchResultDTO struct {
 	StartTime     float64             `json:"startTime"`
 	EndTime       float64             `json:"endTime"`
 	Score         float32             `json:"score"`
-	ModifiedAt    int64               `json:"modifiedAt"`                // Unix timestamp seconds
-	MatchKind     string              `json:"matchKind"`                 // "filename" | "content" | "both"
-	Highlights    []HighlightRangeDTO `json:"highlights,omitempty"`      // byte offsets in FileName
+	ModifiedAt    int64               `json:"modifiedAt"`           // Unix timestamp seconds
+	MatchKind     string              `json:"matchKind"`            // "filename" | "content" | "both"
+	Highlights    []HighlightRangeDTO `json:"highlights,omitempty"` // byte offsets in FileName
 }
 
 // ChipDTO represents a single parsed query filter chip for the frontend.
@@ -75,6 +75,17 @@ type IndexFailureDTO struct {
 	Message      string `json:"message"`
 	Attempts     int    `json:"attempts"`
 	LastFailedAt int64  `json:"lastFailedAt"` // unix seconds
+}
+
+// EmbedderStatsDTO is the JSON-serializable snapshot of embedder activity
+// surfaced on the API Key settings panel.
+type EmbedderStatsDTO struct {
+	Configured    bool   `json:"configured"`
+	Model         string `json:"model"`
+	RequestsToday int    `json:"requestsToday"`
+	CurrentRPM    int    `json:"currentRpm"`
+	MaxRPM        int    `json:"maxRpm"`
+	LastEmbedAt   int64  `json:"lastEmbedAt"` // unix seconds; 0 when never
 }
 
 // IndexStatusDTO is the JSON-serializable indexing status sent to the frontend.

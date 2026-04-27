@@ -22,6 +22,7 @@ type errorEmbedder struct {
 func (e *errorEmbedder) ModelID() string        { return "fake" }
 func (e *errorEmbedder) Dimensions() int        { return 768 }
 func (e *errorEmbedder) PausedUntil() time.Time { return e.pausedUntil }
+func (e *errorEmbedder) Stats() embedder.Stats  { return embedder.Stats{} }
 func (e *errorEmbedder) EmbedQuery(_ context.Context, _ string) ([]float32, error) {
 	return nil, e.queryErr
 }

@@ -187,6 +187,7 @@ func (a *App) emitStatusLoop(ctx context.Context) {
 		case <-ticker.C:
 			status := a.GetIndexStatus()
 			runtime.EventsEmit(a.ctx, "indexing-status", status)
+			runtime.EventsEmit(a.ctx, "embedder-stats", a.GetEmbedderStats())
 		case <-ctx.Done():
 			return
 		}

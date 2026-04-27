@@ -1,5 +1,5 @@
 export namespace app {
-
+	
 	export class ChipDTO {
 	    label: string;
 	    field: string;
@@ -7,11 +7,11 @@ export namespace app {
 	    value: string;
 	    clauseKey: string;
 	    clauseType: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ChipDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.label = source["label"];
@@ -22,16 +22,38 @@ export namespace app {
 	        this.clauseType = source["clauseType"];
 	    }
 	}
+	export class EmbedderStatsDTO {
+	    configured: boolean;
+	    model: string;
+	    requestsToday: number;
+	    currentRpm: number;
+	    maxRpm: number;
+	    lastEmbedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new EmbedderStatsDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.configured = source["configured"];
+	        this.model = source["model"];
+	        this.requestsToday = source["requestsToday"];
+	        this.currentRpm = source["currentRpm"];
+	        this.maxRpm = source["maxRpm"];
+	        this.lastEmbedAt = source["lastEmbedAt"];
+	    }
+	}
 	export class FailureGroupDTO {
 	    code: string;
 	    label: string;
 	    count: number;
 	    sampleFiles: string[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new FailureGroupDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.code = source["code"];
@@ -40,17 +62,31 @@ export namespace app {
 	        this.sampleFiles = source["sampleFiles"];
 	    }
 	}
+	export class HighlightRangeDTO {
+	    start: number;
+	    end: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HighlightRangeDTO(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.start = source["start"];
+	        this.end = source["end"];
+	    }
+	}
 	export class IndexFailureDTO {
 	    path: string;
 	    code: string;
 	    message: string;
 	    attempts: number;
 	    lastFailedAt: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new IndexFailureDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
@@ -71,11 +107,11 @@ export namespace app {
 	    quotaResumeAt: string;
 	    pendingRetryFiles: number;
 	    failedFileGroups: FailureGroupDTO[];
-
+	
 	    static createFrom(source: any = {}) {
 	        return new IndexStatusDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.totalFiles = source["totalFiles"];
@@ -89,7 +125,7 @@ export namespace app {
 	        this.pendingRetryFiles = source["pendingRetryFiles"];
 	        this.failedFileGroups = this.convertValues(source["failedFileGroups"], FailureGroupDTO);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -117,11 +153,11 @@ export namespace app {
 	    errorCode?: string;
 	    warning?: string;
 	    retryAfterMs?: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new ParseQueryResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.chips = this.convertValues(source["chips"], ChipDTO);
@@ -133,7 +169,7 @@ export namespace app {
 	        this.warning = source["warning"];
 	        this.retryAfterMs = source["retryAfterMs"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -163,13 +199,13 @@ export namespace app {
 	    endTime: number;
 	    score: number;
 	    modifiedAt: number;
-	    matchKind: 'filename' | 'content' | 'both';
-	    highlights: Array<{ start: number; end: number }>;
-
+	    matchKind: string;
+	    highlights?: HighlightRangeDTO[];
+	
 	    static createFrom(source: any = {}) {
 	        return new SearchResultDTO(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.filePath = source["filePath"];
@@ -182,20 +218,38 @@ export namespace app {
 	        this.endTime = source["endTime"];
 	        this.score = source["score"];
 	        this.modifiedAt = source["modifiedAt"];
-	        this.matchKind = source["matchKind"] ?? 'content';
-	        this.highlights = source["highlights"] ?? [];
+	        this.matchKind = source["matchKind"];
+	        this.highlights = this.convertValues(source["highlights"], HighlightRangeDTO);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class SearchWithFiltersResult {
 	    results: SearchResultDTO[];
 	    relaxationBanner?: string;
 	    errorCode?: string;
 	    retryAfterMs?: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new SearchWithFiltersResult(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.results = this.convertValues(source["results"], SearchResultDTO);
@@ -203,7 +257,7 @@ export namespace app {
 	        this.errorCode = source["errorCode"];
 	        this.retryAfterMs = source["retryAfterMs"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;

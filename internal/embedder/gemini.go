@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"findo/internal/apperr"
@@ -97,6 +98,14 @@ type GeminiEmbedder struct {
 	maxDelay     time.Duration
 	limiter      *RateLimiter
 	logger       *slog.Logger
+
+	// Activity counters, surfaced via Stats(). Guarded by statsMu. The
+	// requests-today counter rolls over at local midnight (driven by the
+	// requestsDay date stamp) and resets on app restart.
+	statsMu       sync.Mutex
+	requestsToday int
+	requestsDay   string // local YYYY-MM-DD the counter applies to
+	lastEmbedAt   time.Time
 }
 
 var _ Embedder = (*GeminiEmbedder)(nil)
@@ -226,6 +235,7 @@ func (e *GeminiEmbedder) embed(ctx context.Context, contents []*genai.Content, t
 
 		result, err := e.doer(ctx, e.model, contents, config)
 		if err == nil {
+			e.recordSuccess(len(contents))
 			return result, nil
 		}
 
@@ -301,6 +311,45 @@ func (e *GeminiEmbedder) Dimensions() int { return int(e.dims) }
 
 // Limiter returns the rate limiter used by the embedder.
 func (e *GeminiEmbedder) Limiter() *RateLimiter { return e.limiter }
+
+// Stats returns a snapshot of the embedder's recent activity for the UI.
+func (e *GeminiEmbedder) Stats() Stats {
+	e.statsMu.Lock()
+	today := time.Now().Format("2006-01-02")
+	if e.requestsDay != today {
+		// Date rolled over (or first read after startup); reset the counter.
+		e.requestsDay = today
+		e.requestsToday = 0
+	}
+	out := Stats{
+		RequestsToday: e.requestsToday,
+		LastEmbedAt:   e.lastEmbedAt,
+	}
+	e.statsMu.Unlock()
+	if e.limiter != nil {
+		out.CurrentRPM, out.MaxRPM = e.limiter.Stats()
+	}
+	return out
+}
+
+// recordSuccess increments the daily request counter and stamps lastEmbedAt.
+// Called from the embedder's success path. n is the number of API requests
+// represented by the call (== contents length for a batch).
+func (e *GeminiEmbedder) recordSuccess(n int) {
+	if n <= 0 {
+		return
+	}
+	now := time.Now()
+	today := now.Format("2006-01-02")
+	e.statsMu.Lock()
+	if e.requestsDay != today {
+		e.requestsDay = today
+		e.requestsToday = 0
+	}
+	e.requestsToday += n
+	e.lastEmbedAt = now
+	e.statsMu.Unlock()
+}
 
 // PausedUntil returns the time until which the rate limiter is paused.
 // Returns the zero time if no pause is active or the limiter is nil.

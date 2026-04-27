@@ -123,8 +123,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     zIndex: 1500,
-    borderRadius: 'var(--radius-window)',
-    overflow: 'hidden',
   },
   rail: {
     width: 200,

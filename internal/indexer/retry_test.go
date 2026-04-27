@@ -112,6 +112,7 @@ type failThenSucceedEmbedder struct {
 func (f *failThenSucceedEmbedder) ModelID() string        { return "fail-then-succeed" }
 func (f *failThenSucceedEmbedder) Dimensions() int        { return 3 }
 func (f *failThenSucceedEmbedder) PausedUntil() time.Time { return time.Time{} }
+func (f *failThenSucceedEmbedder) Stats() embedder.Stats  { return embedder.Stats{} }
 func (f *failThenSucceedEmbedder) EmbedQuery(_ context.Context, _ string) ([]float32, error) {
 	return []float32{0, 0, 0}, nil
 }
@@ -144,6 +145,7 @@ type alwaysFailEmbedder struct{ err error }
 func (a *alwaysFailEmbedder) ModelID() string        { return "always-fail" }
 func (a *alwaysFailEmbedder) Dimensions() int        { return 3 }
 func (a *alwaysFailEmbedder) PausedUntil() time.Time { return time.Time{} }
+func (a *alwaysFailEmbedder) Stats() embedder.Stats  { return embedder.Stats{} }
 func (a *alwaysFailEmbedder) EmbedQuery(_ context.Context, _ string) ([]float32, error) {
 	return nil, a.err
 }

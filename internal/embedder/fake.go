@@ -34,6 +34,9 @@ func (f *FakeEmbedder) Dimensions() int { return f.dims }
 // PausedUntil returns the configured pause deadline (zero if not paused).
 func (f *FakeEmbedder) PausedUntil() time.Time { return f.pausedUntil }
 
+// Stats returns a zero-valued Stats. Tests don't exercise the activity counters.
+func (f *FakeEmbedder) Stats() Stats { return Stats{} }
+
 // SetPausedUntil configures the pause deadline returned by PausedUntil.
 // Use in tests to simulate an active rate-limiter pause.
 func (f *FakeEmbedder) SetPausedUntil(t time.Time) { f.pausedUntil = t }

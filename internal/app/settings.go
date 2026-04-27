@@ -118,6 +118,29 @@ func (a *App) GetHasGeminiKey() bool {
 	return a.embedder != nil
 }
 
+// GetEmbedderStats returns a snapshot of the embedder's recent activity for
+// the API Key settings panel. Safe to call when no embedder is configured —
+// returns an empty DTO with Configured=false.
+func (a *App) GetEmbedderStats() EmbedderStatsDTO {
+	emb, _ := a.snapshotEmbedderState()
+	if emb == nil {
+		return EmbedderStatsDTO{}
+	}
+	s := emb.Stats()
+	var lastUnix int64
+	if !s.LastEmbedAt.IsZero() {
+		lastUnix = s.LastEmbedAt.Unix()
+	}
+	return EmbedderStatsDTO{
+		Configured:    true,
+		Model:         emb.ModelID(),
+		RequestsToday: s.RequestsToday,
+		CurrentRPM:    s.CurrentRPM,
+		MaxRPM:        s.MaxRPM,
+		LastEmbedAt:   lastUnix,
+	}
+}
+
 // GetNLQueryEnabled returns the current nl_query_enabled setting.
 func (a *App) GetNLQueryEnabled() bool {
 	return a.isNLQueryEnabled()

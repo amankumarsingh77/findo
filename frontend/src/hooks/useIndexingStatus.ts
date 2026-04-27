@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
+import { useSyncExternalStore } from 'react';
+import { EventsOn } from '../../wailsjs/runtime/runtime';
 
 export interface FailureGroup {
   code: string;
@@ -34,18 +34,36 @@ const defaultStatus: IndexingStatus = {
   failedFileGroups: [],
 };
 
+// Single source of truth for indexing status. Multiple components
+// (App's IndexingBar, settings IndexingTab, FoldersTab) all read from this
+// one store so they stay in sync. Wails' EventsOff(name) removes all
+// listeners for an event, so per-component subscriptions caused listeners
+// to clobber each other when components mounted/unmounted.
+let current: IndexingStatus = defaultStatus;
+const listeners = new Set<() => void>();
+let subscribed = false;
+
+function ensureSubscribed() {
+  if (subscribed) return;
+  subscribed = true;
+  EventsOn('indexing-status', (data: IndexingStatus) => {
+    current = data;
+    listeners.forEach((l) => l());
+  });
+}
+
+function subscribe(listener: () => void) {
+  ensureSubscribed();
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function getSnapshot() {
+  return current;
+}
+
 export function useIndexingStatus() {
-  const [status, setStatus] = useState<IndexingStatus>(defaultStatus);
-
-  useEffect(() => {
-    EventsOn('indexing-status', (data: IndexingStatus) => {
-      setStatus(data);
-    });
-
-    return () => {
-      EventsOff('indexing-status');
-    };
-  }, []);
-
-  return status;
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }

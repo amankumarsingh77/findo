@@ -86,6 +86,21 @@ func (rl *RateLimiter) PauseUntil(t time.Time) {
 	}
 }
 
+// Stats returns the number of tokens used inside the current sliding window
+// alongside the configured max. Used to surface rate-limit headroom in the UI.
+func (rl *RateLimiter) Stats() (used, max int) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	cutoff := time.Now().Add(-rl.window)
+	valid := 0
+	for _, t := range rl.tokens {
+		if t.After(cutoff) {
+			valid++
+		}
+	}
+	return valid, rl.maxReqs
+}
+
 // PausedUntil returns the current pause deadline (zero if not paused).
 func (rl *RateLimiter) PausedUntil() time.Time {
 	rl.mu.Lock()

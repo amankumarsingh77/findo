@@ -12,6 +12,9 @@ import ReindexBanner from './components/ReindexBanner';
 import ErrorBanner from './components/ErrorBanner';
 import WarningChip from './components/WarningChip';
 import { OnboardingOverlay } from './components/OnboardingOverlay';
+import { SettingsButton } from './components/SettingsButton';
+import { SettingsPanel } from './components/SettingsPanel';
+import type { SettingsTab } from './components/SettingsPanel';
 import { useSearch } from './hooks/useSearch';
 import { useIndexingStatus } from './hooks/useIndexingStatus';
 import { useHideSuppression } from './hooks/useHideSuppression';
@@ -60,6 +63,10 @@ function App() {
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // Settings panel state
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('folders');
+
   useEffect(() => {
     GetFolders().then(folders => setHasFolders(folders.length > 0));
     GetHasGeminiKey().then(setHasApiKey).catch(() => setHasApiKey(false));
@@ -68,7 +75,8 @@ function App() {
 
   useEffect(() => {
     const _cancel = EventsOn('open-folder-manager', () => {
-      setShowFolderManager(true);
+      setSettingsTab('folders');
+      setShowSettings(true);
     });
     return () => {
       EventsOff('open-folder-manager');
@@ -77,7 +85,8 @@ function App() {
 
   useEffect(() => {
     const _cancel = EventsOn('open-api-key-dialog', () => {
-      setShowApiKeyDialog(true);
+      setSettingsTab('api-key');
+      setShowSettings(true);
     });
     return () => {
       EventsOff('open-api-key-dialog');
@@ -86,6 +95,11 @@ function App() {
 
   useEffect(() => {
     const _cancel = EventsOn('window-shown', () => {
+      // When the global hotkey re-shows the window over an open settings
+      // panel, do not yank focus to the search input — leave whatever the
+      // user was on focused so the panel survives intact.
+      const w = window as unknown as Record<string, unknown>;
+      if (w.__settingsPanelOpen) return;
       const input = document.querySelector('input[type="text"]') as HTMLInputElement;
       if (input) input.focus();
     });
@@ -110,6 +124,13 @@ function App() {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      // While the settings panel is open, the panel owns keyboard input
+      // (Escape closes it, no Arrow/Enter shortcuts apply, and Cmd-R is
+      // not a re-index gesture from this layer). Settings has its own
+      // capture-phase Escape listener; this guard prevents stale handlers
+      // from this component firing on top of it.
+      if (showSettings) return;
+
       if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
         e.preventDefault();
         ReindexNow();
@@ -158,7 +179,7 @@ function App() {
           break;
       }
     },
-    [results, selectedIndex, selectedResult, query, setQuery, setSelectedIndex]
+    [results, selectedIndex, selectedResult, query, setQuery, setSelectedIndex, showSettings]
   );
 
   useEffect(() => {
@@ -172,8 +193,11 @@ function App() {
     // open. The dialog steals focus, fires blur on the Wails window, and then
     // the modal sheet gets dismissed along with its now-hidden parent —
     // exactly the bug users reported with "Add folder".
+    // Also skip if settings panel or popover is open.
     const handleBlur = () => {
       if (isSuppressed()) return;
+      const w = window as unknown as Record<string, unknown>;
+      if (w.__settingsPanelOpen) return;
       HideWindow();
     };
     window.addEventListener('blur', handleBlur);
@@ -195,6 +219,9 @@ function App() {
           warning === 'query_parse_timeout'
             ? <WarningChip key={warning} label="Query understanding was slow" />
             : undefined
+        }
+        rightSlot={
+          <SettingsButton onClick={() => { setSettingsTab('folders'); setShowSettings(true); }} />
         }
       />
       {errorCode === 'ERR_MODEL_MISMATCH' ? (
@@ -264,17 +291,27 @@ function App() {
       {!onboarded && (
         <OnboardingOverlay onDismiss={() => { MarkOnboarded(); setOnboarded(true); }} />
       )}
+      <SettingsPanel
+        open={showSettings}
+        activeTab={settingsTab}
+        onTabChange={setSettingsTab}
+        onClose={() => setShowSettings(false)}
+        onSuccess={(msg) => setToast({ message: msg, type: 'success' })}
+        onError={(msg) => setToast({ message: msg, type: 'error' })}
+      />
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
   root: {
+    position: 'relative',
     display: 'flex',
     flexDirection: 'column',
     width: '100%',
     height: '100%',
     overflow: 'hidden',
+    borderRadius: 'var(--radius-window)',
   },
   body: {
     display: 'flex',

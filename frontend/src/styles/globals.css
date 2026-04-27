@@ -4,6 +4,10 @@
   --bg-base:       rgba(28, 28, 30, 0.85);
   --bg-surface:    rgba(44, 44, 46, 0.72);
   --bg-surface-2:  rgba(58, 58, 60, 0.60);
+  /* Opaque surfaces — use for full-screen overlays, popovers, and floating menus
+     where transparency would cause readability issues by leaking content behind. */
+  --bg-surface-opaque:   #1C1C1E;
+  --bg-surface-opaque-2: #2C2C2E;
   --bg-hover:      rgba(255, 255, 255, 0.07);
   --bg-selected:   rgba(255, 255, 255, 0.12);
   --border:        rgba(255, 255, 255, 0.10);
@@ -24,7 +28,7 @@
   --radius-lg:     12px;
   --radius-window: 18px;
   --radius-row:    8px;
-  --shadow:        0 20px 60px rgba(0,0,0,0.7), 0 0 0 0.5px rgba(255,255,255,0.12);
+  --shadow:        0 8px 20px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.12);
 }
 
 *, *::before, *::after {

@@ -13,6 +13,8 @@ export function EmitEvent(arg1:string):Promise<void>;
 
 export function GetDebugStats():Promise<Record<string, any>>;
 
+export function GetEmbedderStats():Promise<app.EmbedderStatsDTO>;
+
 export function GetFilePreview(arg1:string):Promise<string>;
 
 export function GetFolders():Promise<Array<string>>;

@@ -25,6 +25,7 @@ type fakeCallTracker struct {
 func (f *fakeCallTracker) ModelID() string        { return "fake-tracker" }
 func (f *fakeCallTracker) Dimensions() int        { return 768 }
 func (f *fakeCallTracker) PausedUntil() time.Time { return time.Time{} }
+func (f *fakeCallTracker) Stats() embedder.Stats  { return embedder.Stats{} }
 func (f *fakeCallTracker) EmbedQuery(_ context.Context, _ string) ([]float32, error) {
 	f.embedQueryCalls++
 	return make([]float32, 768), nil

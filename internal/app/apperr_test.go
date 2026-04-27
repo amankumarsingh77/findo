@@ -22,6 +22,7 @@ type failingEmbedder struct{ err error }
 func (f *failingEmbedder) ModelID() string        { return "test-model" }
 func (f *failingEmbedder) Dimensions() int        { return 768 }
 func (f *failingEmbedder) PausedUntil() time.Time { return time.Time{} }
+func (f *failingEmbedder) Stats() embedder.Stats  { return embedder.Stats{} }
 func (f *failingEmbedder) EmbedBatch(_ context.Context, inputs []embedder.ChunkInput) ([][]float32, error) {
 	return nil, f.err
 }

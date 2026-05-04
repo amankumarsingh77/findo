@@ -6,7 +6,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/TFMV/hnsw v0.4.0
 	github.com/energye/systray v1.0.3
-	github.com/fsnotify/fsnotify v1.9.0
+	github.com/fsnotify/fsnotify v1.10.0
 	github.com/ijt/go-anytime v1.9.2
 	github.com/joho/godotenv v1.5.1
 	github.com/markusmobius/go-dateparser v1.2.4
@@ -18,7 +18,7 @@ require (
 	golang.org/x/image v0.39.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/term v0.42.0
-	google.golang.org/genai v1.54.0
+	google.golang.org/genai v1.55.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
